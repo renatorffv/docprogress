@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *node*\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s -o /dev/null -w \"Frontend: HTTP %{http_code}\" http://localhost:3000)",
+      "Bash(curl -s http://localhost:3001/api/training)",
+      "Bash(curl -s -o /dev/null -w \"Frontend: HTTP %{http_code}\" http://localhost:3000/training)"
+    ]
+  }
+}
