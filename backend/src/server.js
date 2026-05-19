@@ -8,6 +8,7 @@ const uploadRoutes = require("./routes/upload");
 const documentRoutes = require("./routes/document");
 const projectRoutes = require("./routes/project");
 const trainingRoutes = require("./routes/training");
+const settingsRoutes = require("./routes/settings");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +26,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/document", documentRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/training", trainingRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

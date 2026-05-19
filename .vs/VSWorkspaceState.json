@@ -1,0 +1,14 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\.claude",
+    "\\backend",
+    "\\frontend",
+    "\\frontend\\src\\app\\projects",
+    "\\frontend\\src\\app\\projects\\[id]",
+    "\\frontend\\src\\app\\training",
+    "\\frontend\\src\\app\\upload"
+  ],
+  "SelectedNode": "\\frontend\\next.config.ts",
+  "PreviewInSolutionExplorer": false
+}

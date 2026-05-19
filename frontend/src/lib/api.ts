@@ -42,6 +42,12 @@ export async function fetchTrainingPreview() {
   return res.json();
 }
 
+export async function fetchSettings() {
+  const res = await fetch(`${API_URL}/api/settings`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Falha ao buscar configurações");
+  return res.json();
+}
+
 // Client-side functions
 const CLIENT_API = "http://localhost:3001";
 
@@ -111,5 +117,18 @@ export async function resetTraining() {
 export async function fetchTrainingPreviewClient() {
   const res = await fetch(`${CLIENT_API}/api/training/preview`);
   if (!res.ok) throw new Error("Falha ao buscar preview");
+  return res.json();
+}
+
+export async function saveCompanySettings(data: unknown) {
+  const res = await fetch(`${CLIENT_API}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Falha ao salvar configurações");
+  }
   return res.json();
 }

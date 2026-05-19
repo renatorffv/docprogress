@@ -7,9 +7,9 @@ async function documentCode(code, fileName) {
   const systemPrompt = buildSystemPrompt();
 
   const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-4-5",
     max_tokens: 8192,
-    system: systemPrompt,
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
     messages: [
       {
         role: "user",
@@ -29,9 +29,9 @@ async function documentProject(files) {
     .join("\n\n");
 
   const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-4-5",
     max_tokens: 8192,
-    system: systemPrompt,
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
     messages: [
       {
         role: "user",

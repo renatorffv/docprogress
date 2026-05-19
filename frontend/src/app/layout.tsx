@@ -29,7 +29,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">
-        <header className="bg-white border-b border-gray-200 shadow-sm">
+        <header className="bg-white border-b border-gray-200 shadow-sm print:hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <Link href="/" className="flex items-center gap-3">
@@ -64,6 +64,12 @@ export default function RootLayout({
                   className="text-sm text-gray-600 hover:text-gray-900"
                 >
                   Treinamento
+                </Link>
+                <Link
+                  href="/settings"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Configurações
                 </Link>
               </nav>
             </div>
