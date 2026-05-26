@@ -9,6 +9,7 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  const [projectName, setProjectName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -17,7 +18,7 @@ export default function UploadPage() {
     setUploading(true);
     setError(null);
     try {
-      const result = await uploadFiles(selectedFiles);
+      const result = await uploadFiles(selectedFiles, projectName.trim() || undefined);
       router.push(`/projects/${result.projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro no upload");
@@ -41,6 +42,19 @@ export default function UploadPage() {
         Envie arquivos Progress 4GL (.p, .w, .i, .cls) para documentacao.
       </p>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Nome do Projeto <span className="text-gray-400 font-normal">(opcional)</span>
+        </label>
+        <input
+          type="text"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          placeholder="Ex: Sistema de Faturamento"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
       <div
         className={`border-2 border-dashed rounded-xl p-12 text-center transition cursor-pointer ${
           dragging
@@ -59,7 +73,7 @@ export default function UploadPage() {
           ref={inputRef}
           type="file"
           multiple
-          accept=".p,.w,.i,.cls,.t"
+          accept=".p,.w,.i,.i1,.i2,.i3,.i4,.i5,.i6,.i7,.i8,.i9,.cls,.t,.r"
           className="hidden"
           onChange={(e) => setSelectedFiles(e.target.files)}
         />
@@ -67,7 +81,7 @@ export default function UploadPage() {
           <p className="text-lg font-medium mb-1">
             Arraste arquivos aqui ou clique para selecionar
           </p>
-          <p className="text-sm">Extensoes aceitas: .p, .w, .i, .cls, .t</p>
+          <p className="text-sm">Extensoes aceitas: .p, .w, .i, .i1~.iN, .cls, .t, .r</p>
         </div>
       </div>
 

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { fetchProjects } from "@/lib/api";
+import ProjectsList from "./ProjectsList";
 
 interface Project {
   id: string;
+  name?: string | null;
   createdAt: string;
   files: { name: string; size: number }[];
   documented: boolean;
@@ -46,34 +48,7 @@ export default async function ProjectsPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              className="block bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-mono text-sm text-gray-500 mb-1">
-                    {project.id.slice(0, 8)}...
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {project.files.length} arquivo(s)
-                    {project.documented && (
-                      <span className="ml-2 text-green-600 font-medium">
-                        Documentado ({project.docsCount} doc(s))
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {new Date(project.createdAt).toLocaleDateString("pt-BR")}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <ProjectsList initialProjects={projects} />
       )}
     </div>
   );

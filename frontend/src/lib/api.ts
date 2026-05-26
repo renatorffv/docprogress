@@ -51,18 +51,25 @@ export async function fetchSettings() {
 // Client-side functions
 const CLIENT_API = "http://localhost:3001";
 
-export async function uploadFiles(files: FileList) {
+export async function uploadFiles(files: FileList, name?: string) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
     formData.append("files", files[i]);
   }
+  if (name) formData.append("name", name);
   const res = await fetch(`${CLIENT_API}/api/upload`, {
     method: "POST",
     body: formData,
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Falha no upload");
+    let msg = "Falha no upload";
+    try {
+      const err = await res.json();
+      msg = err.error || msg;
+    } catch {
+      msg = `Erro ${res.status}: verifique se o backend está rodando`;
+    }
+    throw new Error(msg);
   }
   return res.json();
 }
@@ -117,6 +124,16 @@ export async function resetTraining() {
 export async function fetchTrainingPreviewClient() {
   const res = await fetch(`${CLIENT_API}/api/training/preview`);
   if (!res.ok) throw new Error("Falha ao buscar preview");
+  return res.json();
+}
+
+export async function renameProject(projectId: string, name: string) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/name`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("Falha ao renomear projeto");
   return res.json();
 }
 

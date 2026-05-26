@@ -1,5 +1,5 @@
 const express = require("express");
-const { listProjects, getProject, getProjectFiles } = require("../services/storage");
+const { listProjects, getProject, getProjectFiles, renameProject } = require("../services/storage");
 
 const router = express.Router();
 
@@ -28,6 +28,13 @@ router.get("/:id/files", (req, res) => {
       lines: f.content.split("\n").length,
     })),
   });
+});
+
+router.patch("/:id/name", (req, res) => {
+  const { name } = req.body;
+  const manifest = renameProject(req.params.id, typeof name === "string" ? name.trim() : null);
+  if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
+  res.json({ id: manifest.id, name: manifest.name });
 });
 
 module.exports = router;

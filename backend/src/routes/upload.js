@@ -11,32 +11,38 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = [".p", ".w", ".i", ".cls", ".t", ".r"];
-    if (allowed.includes(ext)) {
+    if (allowed.includes(ext) || /^\.i\d+$/.test(ext)) {
       cb(null, true);
     } else {
-      cb(new Error(`Extensão ${ext} não permitida. Use: ${allowed.join(", ")}`));
+      cb(new Error(`Extensão ${ext} não permitida. Use: .p, .w, .i, .i1~.iN, .cls, .t, .r`));
     }
   },
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-router.post("/", upload.array("files", 100), (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "Nenhum arquivo enviado" });
+router.post("/", (req, res) => {
+  upload.array("files", 1000)(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
     }
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: "Nenhum arquivo enviado" });
+      }
 
-    const projectId = uuidv4();
-    const manifest = saveProject(projectId, req.files);
+      const projectId = uuidv4();
+      const name = typeof req.body.name === "string" ? req.body.name.trim() : null;
+      const manifest = saveProject(projectId, req.files, name || null);
 
-    res.json({
-      projectId,
-      filesCount: manifest.files.length,
-      files: manifest.files.map((f) => ({ name: f.name, size: f.size })),
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+      res.json({
+        projectId,
+        filesCount: manifest.files.length,
+        files: manifest.files.map((f) => ({ name: f.name, size: f.size })),
+      });
+    } catch (saveErr) {
+      res.status(500).json({ error: saveErr.message });
+    }
+  });
 });
 
 module.exports = router;

@@ -4,12 +4,13 @@ const path = require("path");
 const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
 const DOCS_DIR = path.join(__dirname, "..", "docs");
 
-function saveProject(projectId, files) {
+function saveProject(projectId, files, name) {
   const projectDir = path.join(UPLOADS_DIR, projectId);
   fs.mkdirSync(projectDir, { recursive: true });
 
   const manifest = {
     id: projectId,
+    name: name || null,
     createdAt: new Date().toISOString(),
     files: [],
   };
@@ -93,6 +94,15 @@ function listProjects() {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+function renameProject(projectId, name) {
+  const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  manifest.name = name || null;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
 module.exports = {
   saveProject,
   saveDocumentation,
@@ -100,4 +110,5 @@ module.exports = {
   getProjectFiles,
   getDocumentation,
   listProjects,
+  renameProject,
 };

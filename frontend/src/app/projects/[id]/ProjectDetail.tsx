@@ -3,12 +3,13 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateDocFile, generateDocProject } from "@/lib/api";
+import { generateDocFile, generateDocProject, renameProject } from "@/lib/api";
 
 interface ProjectDetailProps {
   projectId: string;
   project: {
     id: string;
+    name?: string | null;
     createdAt: string;
     files: { name: string; size: number }[];
   };
@@ -30,6 +31,26 @@ export default function ProjectDetail({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"files" | "docs">("files");
+  const [projectName, setProjectName] = useState(project.name || "");
+  const [editingName, setEditingName] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  async function handleSaveName() {
+    setSavingName(true);
+    try {
+      await renameProject(projectId, projectName);
+      setEditingName(false);
+    } catch {
+      // silently ignore — nome já está no estado local
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  function handleNameKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSaveName();
+    if (e.key === "Escape") { setProjectName(project.name || ""); setEditingName(false); }
+  }
 
   async function handleDocumentFile(fileName: string) {
     setLoading(fileName);
@@ -96,22 +117,75 @@ export default function ProjectDetail({
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Projeto</h1>
+          {editingName ? (
+            <div className="flex items-center gap-2 mb-1">
+              <input
+                autoFocus
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                onKeyDown={handleNameKeyDown}
+                placeholder="Nome do projeto"
+                className="border border-blue-400 rounded px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={savingName}
+                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition disabled:opacity-50"
+                title="Salvar"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => { setProjectName(project.name || ""); setEditingName(false); }}
+                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded transition"
+                title="Cancelar"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl font-bold">
+                {projectName || "Projeto sem nome"}
+              </h1>
+              <button
+                onClick={() => setEditingName(true)}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition"
+                title="Renomear projeto"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+          )}
           <p className="text-sm text-gray-500 font-mono">{project.id}</p>
           <p className="text-sm text-gray-400">
             Criado em{" "}
             {new Date(project.createdAt).toLocaleDateString("pt-BR")}
           </p>
         </div>
-        <button
-          onClick={handleDocumentProject}
-          disabled={loading !== null}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
-        >
-          {loading === "__project__"
-            ? "Documentando projeto..."
-            : "Documentar Projeto Inteiro"}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleDocumentProject}
+            disabled={loading !== null}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
+          >
+            {loading === "__project__"
+              ? "Documentando projeto..."
+              : "Documentar Projeto Inteiro"}
+          </button>
+          {loading === "__project__" && (
+            <p className="text-xs text-gray-400">
+              Projetos grandes podem levar alguns minutos devido ao limite de tokens da API.
+            </p>
+          )}
+        </div>
       </div>
 
       {error && (
