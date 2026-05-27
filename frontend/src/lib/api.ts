@@ -51,7 +51,7 @@ export async function fetchSettings() {
 // Client-side functions
 const CLIENT_API = "http://localhost:3001";
 
-export async function uploadFiles(files: FileList, name?: string) {
+export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
     formData.append("files", files[i]);
@@ -87,17 +87,43 @@ export async function generateDocFile(projectId: string, fileName: string) {
   return res.json();
 }
 
-export async function generateDocProject(projectId: string) {
+export async function startDocProject(projectId: string): Promise<string> {
   const res = await fetch(`${CLIENT_API}/api/document/project`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projectId }),
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Falha ao gerar documentação");
+    let msg = "Falha ao iniciar documentação";
+    try { const e = await res.json(); msg = e.error || msg; } catch { /* ignore */ }
+    throw new Error(msg);
   }
+  const { jobId } = await res.json();
+  return jobId;
+}
+
+export async function pollDocProject(jobId: string): Promise<{
+  status: string;
+  percent?: number;
+  message?: string;
+  fileName?: string;
+  documentation?: string;
+  error?: string;
+}> {
+  const res = await fetch(`${CLIENT_API}/api/document/project/status/${jobId}`);
+  if (!res.ok) throw new Error("Erro ao consultar status do job");
   return res.json();
+}
+
+// Mantido para compatibilidade — usa polling internamente
+export async function generateDocProject(projectId: string) {
+  const jobId = await startDocProject(projectId);
+  while (true) {
+    await new Promise((r) => setTimeout(r, 4000));
+    const job = await pollDocProject(jobId);
+    if (job.status === "done") return job;
+    if (job.status === "error") throw new Error(job.error || "Erro ao documentar projeto");
+  }
 }
 
 export async function saveTraining(data: unknown) {
