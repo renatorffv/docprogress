@@ -288,6 +288,18 @@ export default function ProjectDetail({
       <div className="grid grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="col-span-1">
+          {tab === "docs" && docs.length > 0 && (
+            <a
+              href={`http://localhost:3001/api/document/${projectId}/export/all`}
+              download
+              className="flex items-center justify-center gap-1.5 w-full mb-3 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              </svg>
+              Baixar Todos ({docs.length})
+            </a>
+          )}
           {tab === "files" ? (
             <ul className="space-y-1">
               {files.map((file) => (

@@ -186,6 +186,33 @@ router.post("/group", (req, res) => {
   res.json({ jobId });
 });
 
+// Download de todas as documentações como ZIP de Word
+router.get("/:projectId/export/all", async (req, res) => {
+  const docs = getDocumentation(req.params.projectId);
+  if (docs.length === 0) return res.status(404).json({ error: "Nenhuma documentação encontrada" });
+
+  try {
+    const settings = getSettings();
+    const JSZip = require("jszip");
+    const zip = new JSZip();
+
+    for (const doc of docs) {
+      const title = doc.fileName.replace(/\.md$/, "");
+      const buffer = await markdownToDocx(doc.content, title, settings);
+      const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
+      zip.file(`${safeName}.docx`, buffer);
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="documentacoes.zip"');
+    res.send(zipBuffer);
+  } catch (err) {
+    console.error("Erro ao gerar ZIP:", err);
+    res.status(500).json({ error: "Falha ao gerar ZIP: " + err.message });
+  }
+});
+
 // Download de documentação em formato Word
 router.get("/:projectId/export/docx", async (req, res) => {
   const { doc } = req.query;
