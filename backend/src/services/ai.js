@@ -200,4 +200,185 @@ async function documentProject(files, onProgress) {
   return synthesis.content[0].text;
 }
 
-module.exports = { documentCode, documentProject };
+/**
+ * Analisa todos os arquivos do projeto e identifica grupos de programas.
+ * Retorna array de grupos conforme convenções do ERP Datasul.
+ */
+async function analyzeProjectGroups(files, dependencyGraph, onProgress) {
+  const report = (data) => onProgress?.(data);
+  const systemPrompt = buildSystemPrompt();
+
+  report({ percent: 15, message: "Preparando dados para análise..." });
+
+  // Monta o grafo de dependências em texto
+  const graphLines = [];
+  for (const [key, node] of dependencyGraph.entries()) {
+    const parts = [];
+    if (node.runs.length > 0) parts.push(`chama: [${node.runs.join(", ")}]`);
+    if (node.includes.length > 0) parts.push(`inclui: [${node.includes.join(", ")}]`);
+    graphLines.push(`- ${node.name}${parts.length ? " → " + parts.join(" | ") : " → (sem referências)"}`);
+  }
+
+  // Resumo do conteúdo de cada arquivo (primeiras 20 linhas não vazias)
+  const { fileSummary } = require("./analyzer");
+  const summaries = files
+    .map((f) => `### ${f.name}\n${fileSummary(f.content, 20)}`)
+    .join("\n\n");
+
+  const prompt = `Você é um especialista em Progress 4GL para o ERP Datasul.
+
+Analise os arquivos abaixo e agrupe-os em "programas" lógicos distintos.
+
+CONVENÇÕES DO DATASUL:
+- Arquivos com o mesmo prefixo de nome geralmente pertencem ao mesmo programa
+  (ex: esft0001.w + esft0001rp.p + esft0001.i → programa "esft0001")
+- Sufixos comuns: "rp" = procedure de relatório, "v" = viewer, "b" = business object,
+  "f" = filtro/frame, "00"/"01" = subprogramas sequenciais
+- Arquivos .i são includes — inclua no grupo que mais os usa ou que os chama diretamente
+- Um relatório: normalmente 1 .w (tela de parâmetros) + 1 .p com sufixo "rp"
+- Uma tela/manutenção: normalmente 1 .w container + 1 ou mais .w viewers
+
+DEPENDÊNCIAS DETECTADAS ESTATICAMENTE:
+${graphLines.join("\n")}
+
+RESUMO DO CONTEÚDO DOS ARQUIVOS:
+${summaries}
+
+Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
+{
+  "groups": [
+    {
+      "id": "identificador_sem_extensao",
+      "name": "Nome descritivo em português",
+      "type": "relatorio|tela|procedure|util|outro",
+      "mainFile": "arquivo_principal.ext",
+      "files": ["arquivo1.ext", "arquivo2.ext"],
+      "description": "Descrição breve do que este programa faz (1-2 frases)"
+    }
+  ]
+}`;
+
+  report({ percent: 30, message: "Enviando análise para a IA..." });
+
+  const message = await callWithRetry(
+    () => client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 8192,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: prompt }],
+    }),
+    report
+  );
+
+  report({ percent: 80, message: "Processando resultado da análise..." });
+
+  const text = message.content[0].text.trim();
+  // Remove possíveis blocos markdown se Claude os incluir mesmo com instrução
+  const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+
+  try {
+    const result = JSON.parse(clean);
+    return result.groups || [];
+  } catch {
+    throw new Error("A IA retornou um formato inesperado. Tente novamente.");
+  }
+}
+
+/**
+ * Documenta um conjunto de arquivos como um único programa Datasul.
+ */
+async function documentGroup(groupFiles, groupName, groupType, groupDescription, onProgress) {
+  const report = (data) => onProgress?.(data);
+  const systemPrompt = buildSystemPrompt();
+  const systemBlock = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
+
+  const typeLabel = {
+    relatorio: "Relatório",
+    tela: "Tela / Manutenção",
+    procedure: "Procedure",
+    util: "Utilitário",
+    outro: "Programa",
+  }[groupType] || "Programa";
+
+  report({ percent: 5, message: `Preparando documentação do programa ${groupName}...` });
+
+  const chunks = splitIntoChunks(groupFiles);
+  const totalSteps = chunks.length + (chunks.length > 1 ? 1 : 0);
+
+  if (chunks.length === 1) {
+    const filesContent = chunks[0].files
+      .map((f) => `### Arquivo: ${f.name}\n\`\`\`progress\n${f.content}\n\`\`\``)
+      .join("\n\n");
+
+    report({ percent: 20, message: `Documentando ${groupFiles.length} arquivo(s) do programa...` });
+
+    const message = await callWithRetry(
+      () => client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 8192,
+        system: systemBlock,
+        messages: [{
+          role: "user",
+          content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única. Cubra: objetivo, parâmetros, lógica principal, integração com o Datasul e observações técnicas.\n\n${filesContent}`,
+        }],
+      }),
+      report
+    );
+
+    report({ percent: 95, message: "Salvando documentação..." });
+    return message.content[0].text;
+  }
+
+  // Múltiplos lotes
+  const chunkDocs = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const basePercent = Math.round(10 + (i / totalSteps) * 70);
+    if (i > 0) {
+      const waitMs = delayForChars(chunks[i - 1].size);
+      await sleepWithCountdown(waitMs, (remaining) => {
+        report({ percent: basePercent, message: `Lote ${i} concluído — aguardando ${remaining}s...` });
+      });
+    }
+    report({ percent: basePercent + 5, message: `Documentando lote ${i + 1} de ${chunks.length}...` });
+    const filesContent = chunks[i].files
+      .map((f) => `### Arquivo: ${f.name}\n\`\`\`progress\n${f.content}\n\`\`\``)
+      .join("\n\n");
+    const message = await callWithRetry(
+      () => client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 8192,
+        system: systemBlock,
+        messages: [{
+          role: "user",
+          content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\n${filesContent}`,
+        }],
+      }),
+      report
+    );
+    chunkDocs.push(message.content[0].text);
+  }
+
+  const lastWait = delayForChars(chunks[chunks.length - 1].size);
+  await sleepWithCountdown(lastWait, (remaining) => {
+    report({ percent: 82, message: `Preparando síntese — aguardando ${remaining}s...` });
+  });
+
+  report({ percent: 87, message: "Gerando documentação consolidada do programa..." });
+  const combined = chunkDocs.map((d, i) => `## Parte ${i + 1}\n\n${d}`).join("\n\n---\n\n");
+  const synthesis = await callWithRetry(
+    () => client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 8192,
+      system: systemBlock,
+      messages: [{
+        role: "user",
+        content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\n${combined}`,
+      }],
+    }),
+    report
+  );
+  report({ percent: 98, message: "Salvando..." });
+  return synthesis.content[0].text;
+}
+
+module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup };

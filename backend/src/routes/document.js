@@ -1,6 +1,7 @@
 const express = require("express");
-const { documentCode, documentProject } = require("../services/ai");
-const { getProjectFiles, saveDocumentation, getDocumentation } = require("../services/storage");
+const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
+const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis } = require("../services/storage");
+const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
 
@@ -99,6 +100,90 @@ router.get("/project/status/:jobId", (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) return res.status(404).json({ error: "Job não encontrado" });
   res.json(job);
+});
+
+// Retorna análise de grupos já salva
+router.get("/analysis/:projectId", (req, res) => {
+  const analysis = getAnalysis(req.params.projectId);
+  if (!analysis) return res.status(404).json({ error: "Análise não encontrada" });
+  res.json(analysis);
+});
+
+// Inicia análise de grupos em background
+router.post("/analyze/:projectId", (req, res) => {
+  const { projectId } = req.params;
+  const files = getProjectFiles(projectId);
+  if (!files) return res.status(404).json({ error: "Projeto não encontrado" });
+
+  pruneJobs();
+  const jobId = crypto.randomUUID();
+  jobs.set(jobId, { status: "running", percent: 0, message: "Iniciando análise...", createdAt: Date.now() });
+
+  (async () => {
+    try {
+      const depGraph = buildDependencyGraph(files);
+      const groups = await analyzeProjectGroups(files, depGraph, ({ percent, message }) => {
+        const cur = jobs.get(jobId) || {};
+        jobs.set(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
+      });
+      const analysis = saveAnalysis(projectId, groups);
+      jobs.set(jobId, {
+        status: "done", percent: 100,
+        message: `${groups.length} programa(s) identificado(s)!`,
+        analysis,
+        createdAt: Date.now(),
+      });
+    } catch (err) {
+      jobs.set(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
+    }
+  })();
+
+  res.json({ jobId });
+});
+
+// Documenta um grupo de arquivos como um programa
+router.post("/group", (req, res) => {
+  const { projectId, groupId, fileNames, groupName, groupType, groupDescription } = req.body;
+  if (!projectId || !groupId || !fileNames?.length) {
+    return res.status(400).json({ error: "projectId, groupId e fileNames são obrigatórios" });
+  }
+
+  const allFiles = getProjectFiles(projectId);
+  if (!allFiles) return res.status(404).json({ error: "Projeto não encontrado" });
+
+  const groupFiles = allFiles.filter((f) => fileNames.includes(f.name));
+  if (groupFiles.length === 0) return res.status(404).json({ error: "Nenhum arquivo do grupo encontrado" });
+
+  pruneJobs();
+  const jobId = crypto.randomUUID();
+  jobs.set(jobId, { status: "running", percent: 0, message: "Iniciando...", createdAt: Date.now() });
+
+  (async () => {
+    try {
+      const markdown = await documentGroup(
+        groupFiles,
+        groupName || groupId,
+        groupType || "outro",
+        groupDescription || "",
+        ({ percent, message }) => {
+          const cur = jobs.get(jobId) || {};
+          jobs.set(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
+        }
+      );
+      const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
+      jobs.set(jobId, {
+        status: "done", percent: 100,
+        message: "Documentação concluída!",
+        fileName: doc.fileName,
+        documentation: markdown,
+        createdAt: Date.now(),
+      });
+    } catch (err) {
+      jobs.set(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
+    }
+  })();
+
+  res.json({ jobId });
 });
 
 // Download de documentação em formato Word

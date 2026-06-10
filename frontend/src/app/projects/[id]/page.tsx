@@ -1,4 +1,4 @@
-import { fetchProject, fetchProjectFiles, fetchDocumentation } from "@/lib/api";
+import { fetchProject, fetchProjectFiles, fetchDocumentation, fetchAnalysis } from "@/lib/api";
 import ProjectDetail from "./ProjectDetail";
 
 interface Props {
@@ -11,13 +11,15 @@ export default async function ProjectPage({ params }: Props) {
   let project = null;
   let files: { name: string; content: string; lines: number }[] = [];
   let docs: { fileName: string; content: string }[] = [];
+  let analysis = null;
   let error: string | null = null;
 
   try {
-    [project, { files }, { docs }] = await Promise.all([
+    [project, { files }, { docs }, analysis] = await Promise.all([
       fetchProject(id),
       fetchProjectFiles(id),
       fetchDocumentation(id),
+      fetchAnalysis(id),
     ]);
   } catch {
     error = "Erro ao carregar projeto. Verifique se o backend esta rodando.";
@@ -39,6 +41,7 @@ export default async function ProjectPage({ params }: Props) {
       project={project}
       files={files}
       initialDocs={docs}
+      initialAnalysis={analysis}
     />
   );
 }

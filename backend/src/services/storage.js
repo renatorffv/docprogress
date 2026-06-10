@@ -103,6 +103,20 @@ function renameProject(projectId, name) {
   return manifest;
 }
 
+function saveAnalysis(projectId, groups) {
+  const docDir = path.join(DOCS_DIR, projectId);
+  fs.mkdirSync(docDir, { recursive: true });
+  const data = { analyzedAt: new Date().toISOString(), groups };
+  fs.writeFileSync(path.join(docDir, "_analysis.json"), JSON.stringify(data, null, 2));
+  return data;
+}
+
+function getAnalysis(projectId) {
+  const filePath = path.join(DOCS_DIR, projectId, "_analysis.json");
+  if (!fs.existsSync(filePath)) return null;
+  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+}
+
 module.exports = {
   saveProject,
   saveDocumentation,
@@ -111,4 +125,6 @@ module.exports = {
   getDocumentation,
   listProjects,
   renameProject,
+  saveAnalysis,
+  getAnalysis,
 };

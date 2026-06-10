@@ -163,6 +163,41 @@ export async function renameProject(projectId: string, name: string) {
   return res.json();
 }
 
+export async function fetchAnalysis(projectId: string) {
+  const res = await fetch(`${API_URL}/api/document/analysis/${projectId}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function startAnalysis(projectId: string): Promise<string> {
+  const res = await fetch(`${CLIENT_API}/api/document/analyze/${projectId}`, { method: "POST" });
+  if (!res.ok) throw new Error("Falha ao iniciar análise");
+  const { jobId } = await res.json();
+  return jobId;
+}
+
+export async function startDocGroup(
+  projectId: string,
+  groupId: string,
+  fileNames: string[],
+  groupName: string,
+  groupType: string,
+  groupDescription: string
+): Promise<string> {
+  const res = await fetch(`${CLIENT_API}/api/document/group`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId, groupId, fileNames, groupName, groupType, groupDescription }),
+  });
+  if (!res.ok) {
+    let msg = "Falha ao iniciar documentação do grupo";
+    try { const e = await res.json(); msg = e.error || msg; } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  const { jobId } = await res.json();
+  return jobId;
+}
+
 export async function saveCompanySettings(data: unknown) {
   const res = await fetch(`${CLIENT_API}/api/settings`, {
     method: "PUT",
