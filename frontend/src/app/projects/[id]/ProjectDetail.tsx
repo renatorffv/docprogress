@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { generateDocFile, startDocProject, pollDocProject, renameProject } from "@/lib/api";
@@ -39,6 +39,19 @@ export default function ProjectDetail({
   const [projectName, setProjectName] = useState(project.name || "");
   const [editingName, setEditingName] = useState(false);
   const [savingName, setSavingName] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDownloadMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setShowDownloadMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showDownloadMenu]);
 
   async function handleSaveName() {
     setSavingName(true);
@@ -289,16 +302,46 @@ export default function ProjectDetail({
         {/* Sidebar */}
         <div className="col-span-1">
           {tab === "docs" && docs.length > 0 && (
-            <a
-              href={`http://localhost:3001/api/document/${projectId}/export/all`}
-              download
-              className="flex items-center justify-center gap-1.5 w-full mb-3 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-              </svg>
-              Baixar Todos ({docs.length})
-            </a>
+            <div ref={downloadMenuRef} className="relative mb-3">
+              <button
+                onClick={() => setShowDownloadMenu((v) => !v)}
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                </svg>
+                Baixar Todos ({docs.length})
+                <svg className={`w-3 h-3 transition-transform ${showDownloadMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showDownloadMenu && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                  <a
+                    href={`http://localhost:3001/api/document/${projectId}/export/all?format=docx`}
+                    download
+                    onClick={() => setShowDownloadMenu(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Word (.docx)
+                  </a>
+                  <a
+                    href={`http://localhost:3001/api/document/${projectId}/export/all?format=pdf`}
+                    download
+                    onClick={() => setShowDownloadMenu(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100"
+                  >
+                    <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    PDF (.pdf)
+                  </a>
+                </div>
+              )}
+            </div>
           )}
           {tab === "files" ? (
             <ul className="space-y-1">

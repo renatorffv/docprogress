@@ -4,6 +4,7 @@ const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getA
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
+const { markdownToPdf } = require("../services/pdfExport");
 
 const router = express.Router();
 
@@ -186,10 +187,12 @@ router.post("/group", (req, res) => {
   res.json({ jobId });
 });
 
-// Download de todas as documentações como ZIP de Word
+// Download de todas as documentações como ZIP (Word ou PDF)
 router.get("/:projectId/export/all", async (req, res) => {
   const docs = getDocumentation(req.params.projectId);
   if (docs.length === 0) return res.status(404).json({ error: "Nenhuma documentação encontrada" });
+
+  const format = req.query.format === "pdf" ? "pdf" : "docx";
 
   try {
     const settings = getSettings();
@@ -198,14 +201,19 @@ router.get("/:projectId/export/all", async (req, res) => {
 
     for (const doc of docs) {
       const title = doc.fileName.replace(/\.md$/, "");
-      const buffer = await markdownToDocx(doc.content, title, settings);
       const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
-      zip.file(`${safeName}.docx`, buffer);
+      if (format === "pdf") {
+        const buffer = await markdownToPdf(doc.content, title, settings);
+        zip.file(`${safeName}.pdf`, buffer);
+      } else {
+        const buffer = await markdownToDocx(doc.content, title, settings);
+        zip.file(`${safeName}.docx`, buffer);
+      }
     }
 
     const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", 'attachment; filename="documentacoes.zip"');
+    res.setHeader("Content-Disposition", `attachment; filename="documentacoes_${format}.zip"`);
     res.send(zipBuffer);
   } catch (err) {
     console.error("Erro ao gerar ZIP:", err);
