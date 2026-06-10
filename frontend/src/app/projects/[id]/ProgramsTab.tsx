@@ -55,6 +55,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
 
   const [groupJobs, setGroupJobs] = useState<Record<string, { percent: number; message: string } | null>>({});
   const [groupErrors, setGroupErrors] = useState<Record<string, string | null>>({});
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
   function docFileForGroup(groupId: string) {
     return existingDocs.find((d) => d.fileName === `_grp_${groupId}.md`);
@@ -73,6 +74,18 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
       setAnalysisError(err instanceof Error ? err.message : "Erro na análise");
       setAnalysisJob(null);
     }
+  }
+
+  async function handleDocumentAll() {
+    if (!analysis) return;
+    const pending = analysis.groups.filter((g) => !docFileForGroup(g.id));
+    if (pending.length === 0) return;
+    setBulkProgress({ current: 0, total: pending.length });
+    for (let i = 0; i < pending.length; i++) {
+      setBulkProgress({ current: i + 1, total: pending.length });
+      await handleDocumentGroup(pending[i]);
+    }
+    setBulkProgress(null);
   }
 
   async function handleDocumentGroup(group: Group) {
@@ -99,7 +112,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <div>
           {analysis ? (
             <p className="text-sm text-gray-500">
@@ -111,14 +124,35 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
               Analise os arquivos para identificar os programas e gerar documentações individuais.
             </p>
           )}
+          {bulkProgress && (
+            <p className="text-sm font-medium text-blue-600 mt-1">
+              Documentando {bulkProgress.current} de {bulkProgress.total}...
+            </p>
+          )}
         </div>
-        <button
-          onClick={handleAnalyze}
-          disabled={analysisJob !== null}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
-        >
-          {analysisJob ? "Analisando..." : analysis ? "Re-analisar" : "Analisar Programas"}
-        </button>
+        <div className="flex items-center gap-2">
+          {analysis && (() => {
+            const pending = analysis.groups.filter((g) => !docFileForGroup(g.id));
+            return pending.length > 0 ? (
+              <button
+                onClick={handleDocumentAll}
+                disabled={!!bulkProgress || analysisJob !== null}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+              >
+                {bulkProgress
+                  ? `Documentando ${bulkProgress.current}/${bulkProgress.total}...`
+                  : `Documentar Tudo (${pending.length})`}
+              </button>
+            ) : null;
+          })()}
+          <button
+            onClick={handleAnalyze}
+            disabled={!!analysisJob || !!bulkProgress}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
+          >
+            {analysisJob ? "Analisando..." : analysis ? "Re-analisar" : "Analisar Programas"}
+          </button>
+        </div>
       </div>
 
       {/* Progress da análise */}
@@ -189,7 +223,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
                   <div className="flex flex-col items-end gap-2 shrink-0 min-w-[140px]">
                     <button
                       onClick={() => handleDocumentGroup(group)}
-                      disabled={job !== null}
+                      disabled={!!job || !!bulkProgress}
                       className="w-full px-3 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition text-center"
                     >
                       {job ? "Documentando..." : documented ? "Re-documentar" : "Documentar"}
@@ -210,7 +244,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
                 </div>
 
                 {/* Progress por grupo */}
-                {job && (
+                {!!job && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs text-gray-500">{job.message}</span>
