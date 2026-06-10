@@ -269,7 +269,7 @@ export default function ProjectDetail({
           projectId={projectId}
           initialAnalysis={initialAnalysis as never}
           existingDocs={docs}
-          onDocCreated={(fileName, content) => {
+          onDocCreated={(fileName, content, autoNavigate = true) => {
             setDocs((prev) => {
               const idx = prev.findIndex((d) => d.fileName === fileName);
               if (idx >= 0) {
@@ -279,7 +279,7 @@ export default function ProjectDetail({
               }
               return content ? [...prev, { fileName, content }] : prev;
             });
-            if (content) { setSelectedDoc(fileName); setTab("docs"); }
+            if (content && autoNavigate) { setSelectedDoc(fileName); setTab("docs"); }
           }}
         />
       )}

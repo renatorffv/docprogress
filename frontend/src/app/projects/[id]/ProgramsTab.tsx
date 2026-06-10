@@ -21,7 +21,7 @@ interface Props {
   projectId: string;
   initialAnalysis: Analysis | null;
   existingDocs: { fileName: string }[];
-  onDocCreated: (fileName: string, content: string) => void;
+  onDocCreated: (fileName: string, content: string, autoNavigate?: boolean) => void;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -81,14 +81,17 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
     const pending = analysis.groups.filter((g) => !docFileForGroup(g.id));
     if (pending.length === 0) return;
     setBulkProgress({ current: 0, total: pending.length });
-    for (let i = 0; i < pending.length; i++) {
-      setBulkProgress({ current: i + 1, total: pending.length });
-      await handleDocumentGroup(pending[i]);
+    try {
+      for (let i = 0; i < pending.length; i++) {
+        setBulkProgress({ current: i + 1, total: pending.length });
+        await handleDocumentGroup(pending[i], false);
+      }
+    } finally {
+      setBulkProgress(null);
     }
-    setBulkProgress(null);
   }
 
-  async function handleDocumentGroup(group: Group) {
+  async function handleDocumentGroup(group: Group, navigate = true) {
     setGroupErrors((p) => ({ ...p, [group.id]: null }));
     setGroupJobs((p) => ({ ...p, [group.id]: { percent: 0, message: "Iniciando..." } }));
     try {
@@ -100,7 +103,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
         (prog) => setGroupJobs((p) => ({ ...p, [group.id]: prog })),
         async (result) => {
           setGroupJobs((p) => ({ ...p, [group.id]: null }));
-          onDocCreated(result.fileName as string, result.documentation as string);
+          onDocCreated(result.fileName as string, result.documentation as string, navigate);
         }
       );
     } catch (err) {
