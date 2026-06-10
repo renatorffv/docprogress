@@ -1,216 +1,194 @@
-const PDFDocument = require("pdfkit");
+const puppeteer = require("puppeteer-core");
 const { marked } = require("marked");
+const fs = require("fs");
 
-const FONT_NORMAL = "Helvetica";
-const FONT_BOLD = "Helvetica-Bold";
-const FONT_MONO = "Courier";
-const MARGIN = 55;
-const TEXT_WIDTH = 595 - MARGIN * 2; // A4 width minus margins
+// ── Locate system Chrome / Edge on Windows ──────────────────────────────────
+function findBrowserPath() {
+  const candidates = [
+    process.env.CHROME_PATH,
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Google\\Chrome Beta\\Application\\chrome.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  ].filter(Boolean);
 
-function stripInline(text) {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/~~([^~]+)~~/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-}
-
-function renderTokens(doc, tokens) {
-  for (const token of tokens) {
-    switch (token.type) {
-      case "heading": {
-        const sizes = [22, 18, 15, 13, 12, 11];
-        const size = sizes[token.depth - 1] ?? 12;
-        if (token.depth === 1) doc.moveDown(0.4);
-        doc
-          .fontSize(size)
-          .font(FONT_BOLD)
-          .fillColor("#1a1a2e")
-          .text(stripInline(token.text), { width: TEXT_WIDTH, lineGap: 2 });
-        doc.moveDown(token.depth === 1 ? 0.5 : 0.3);
-        doc.fillColor("#000000");
-        break;
-      }
-      case "paragraph": {
-        doc
-          .fontSize(10)
-          .font(FONT_NORMAL)
-          .fillColor("#222222")
-          .text(stripInline(token.text), { width: TEXT_WIDTH, lineGap: 3 });
-        doc.moveDown(0.5);
-        doc.fillColor("#000000");
-        break;
-      }
-      case "code": {
-        const lines = token.text.split("\n");
-        const codeY = doc.y;
-        // Gray background box
-        const approxHeight = lines.length * 12 + 16;
-        const remainingPage = doc.page.height - doc.page.margins.bottom - codeY;
-        if (approxHeight > remainingPage && remainingPage < 80) doc.addPage();
-        const boxY = doc.y;
-        doc
-          .save()
-          .rect(MARGIN - 6, boxY, TEXT_WIDTH + 12, approxHeight)
-          .fill("#f3f4f6")
-          .restore();
-        doc
-          .fontSize(8)
-          .font(FONT_MONO)
-          .fillColor("#1f2937")
-          .text(token.text, MARGIN, boxY + 8, { width: TEXT_WIDTH, lineGap: 2 });
-        doc.moveDown(0.6);
-        doc.fillColor("#000000");
-        break;
-      }
-      case "list": {
-        for (const item of token.items) {
-          const bullet = token.ordered ? `${token.items.indexOf(item) + 1}.` : "•";
-          doc
-            .fontSize(10)
-            .font(FONT_NORMAL)
-            .fillColor("#222222")
-            .text(`${bullet}  ${stripInline(item.text)}`, {
-              width: TEXT_WIDTH - 16,
-              indent: 16,
-              lineGap: 2,
-            });
-        }
-        doc.moveDown(0.4);
-        doc.fillColor("#000000");
-        break;
-      }
-      case "table": {
-        const colCount = token.header.length;
-        const colWidth = Math.floor(TEXT_WIDTH / colCount);
-        // Header row
-        doc.font(FONT_BOLD).fontSize(9).fillColor("#1a1a2e");
-        let x = MARGIN;
-        for (const cell of token.header) {
-          doc.text(stripInline(cell.text), x, doc.y, { width: colWidth, lineBreak: false });
-          x += colWidth;
-        }
-        doc.moveDown(0.3);
-        doc
-          .moveTo(MARGIN, doc.y)
-          .lineTo(MARGIN + TEXT_WIDTH, doc.y)
-          .strokeColor("#cccccc")
-          .stroke();
-        doc.moveDown(0.2);
-        // Body rows
-        doc.font(FONT_NORMAL).fontSize(9).fillColor("#222222");
-        for (const row of token.rows) {
-          x = MARGIN;
-          const rowY = doc.y;
-          for (const cell of row) {
-            doc.text(stripInline(cell.text), x, rowY, { width: colWidth, lineBreak: false });
-            x += colWidth;
-          }
-          doc.moveDown(0.35);
-        }
-        doc.moveDown(0.4);
-        doc.fillColor("#000000");
-        break;
-      }
-      case "hr": {
-        doc.moveDown(0.3);
-        doc
-          .moveTo(MARGIN, doc.y)
-          .lineTo(MARGIN + TEXT_WIDTH, doc.y)
-          .strokeColor("#dddddd")
-          .stroke();
-        doc.moveDown(0.3);
-        break;
-      }
-      case "space":
-        doc.moveDown(0.3);
-        break;
-      default:
-        break;
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {
+      // keep trying
     }
   }
+  return null;
 }
 
-async function markdownToPdf(content, title, settings) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const doc = new PDFDocument({
-      margin: MARGIN,
-      size: "A4",
-      info: { Title: title, Creator: settings?.companyName || "DocProgress" },
-    });
+// ── Build full HTML page (mirrors PrintContent.tsx) ─────────────────────────
+function buildHtml(markdownContent, title, settings) {
+  const bodyHtml = marked.parse(markdownContent, { gfm: true, breaks: false });
 
-    doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
+  const logoHtml =
+    settings?.logoBase64
+      ? `<img src="${settings.logoBase64}" alt="Logo" style="max-height:64px;max-width:200px;object-fit:contain;">`
+      : "";
 
-    // ── Header ───────────────────────────────────────────────────────────────
-    let headerY = MARGIN - 10;
-    let logoWidth = 0;
-    if (settings?.logoBase64) {
-      try {
-        const b64 = settings.logoBase64.includes(",")
-          ? settings.logoBase64.split(",")[1]
-          : settings.logoBase64;
-        const logoBuffer = Buffer.from(b64, "base64");
-        logoWidth = 36;
-        doc.image(logoBuffer, MARGIN, headerY, { height: logoWidth });
-      } catch {
-        /* ignore bad logo */
-      }
-    }
-    if (settings?.companyName) {
-      doc
-        .fontSize(11)
-        .font(FONT_BOLD)
-        .fillColor("#1a1a2e")
-        .text(settings.companyName, MARGIN + logoWidth + 8, headerY + 10, {
-          width: TEXT_WIDTH - logoWidth - 8,
-        });
-    }
+  const companyHtml =
+    settings?.companyName
+      ? `<span style="font-size:20px;font-weight:700;color:#1f2937;">${escHtml(settings.companyName)}</span>`
+      : "";
 
-    // Separator line
-    doc
-      .moveTo(MARGIN, headerY + 42)
-      .lineTo(MARGIN + TEXT_WIDTH, headerY + 42)
-      .strokeColor("#cccccc")
-      .stroke();
+  const headerHtml =
+    logoHtml || companyHtml
+      ? `<div style="display:flex;align-items:center;gap:20px;padding-bottom:24px;margin-bottom:32px;border-bottom:2px solid #1f2937;">
+           ${logoHtml}${companyHtml}
+         </div>`
+      : "";
 
-    doc.y = headerY + 52;
-
-    // ── Title ────────────────────────────────────────────────────────────────
-    doc
-      .fontSize(18)
-      .font(FONT_BOLD)
-      .fillColor("#1a1a2e")
-      .text(title.replace(/^_grp_|^_projeto/, ""), { width: TEXT_WIDTH });
-    doc.moveDown(0.8);
-    doc.fillColor("#000000");
-
-    // ── Body ─────────────────────────────────────────────────────────────────
-    const tokens = marked.lexer(content);
-    renderTokens(doc, tokens);
-
-    // ── Footer (page number) ─────────────────────────────────────────────────
-    const range = doc.bufferedPageRange();
-    for (let i = 0; i < range.count; i++) {
-      doc.switchToPage(range.start + i);
-      const footerY = doc.page.height - 35;
-      doc
-        .fontSize(8)
-        .font(FONT_NORMAL)
-        .fillColor("#999999")
-        .text(
-          `${title} · Gerado em ${new Date().toLocaleDateString("pt-BR")} · Pág. ${i + 1}/${range.count}`,
-          MARGIN,
-          footerY,
-          { width: TEXT_WIDTH, align: "right" }
-        );
-    }
-
-    doc.end();
+  const date = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
   });
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #111827;
+    background: #fff;
+    margin: 0;
+    padding: 0 60px 60px;
+  }
+
+  /* ── Typography ── */
+  h1 { font-size: 1.75em; font-weight: 700; color: #111827; margin: 1.4em 0 0.5em; padding-bottom: 0.3em; border-bottom: 1px solid #e5e7eb; }
+  h2 { font-size: 1.35em; font-weight: 700; color: #111827; margin: 1.3em 0 0.45em; }
+  h3 { font-size: 1.15em; font-weight: 700; color: #111827; margin: 1.2em 0 0.4em; }
+  h4, h5, h6 { font-size: 1em; font-weight: 700; color: #374151; margin: 1em 0 0.35em; }
+  p { margin: 0.7em 0; }
+  a { color: #2563eb; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+  blockquote { border-left: 4px solid #e5e7eb; margin: 1em 0; padding: 0.3em 1em; color: #6b7280; }
+
+  /* ── Code ── */
+  pre {
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-size: 11.5px;
+    line-height: 1.55;
+    margin: 1em 0;
+  }
+  code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11.5px;
+  }
+  p code, li code, td code, th code {
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ── Lists ── */
+  ul, ol { margin: 0.7em 0; padding-left: 1.6em; }
+  li { margin: 0.25em 0; }
+  li > ul, li > ol { margin: 0.2em 0; }
+
+  /* ── Tables (GFM) ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 12px;
+    table-layout: auto;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+  td {
+    padding: 7px 12px;
+    border: 1px solid #d1d5db;
+    vertical-align: top;
+    word-break: break-word;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 48px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+</style>
+</head>
+<body>
+  ${headerHtml}
+  <div class="prose">
+    ${bodyHtml}
+  </div>
+  <div class="doc-footer">
+    <span>${escHtml(title)}</span>
+    <span>Gerado em ${date}</span>
+  </div>
+</body>
+</html>`;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+async function markdownToPdf(content, title, settings) {
+  const executablePath = findBrowserPath();
+  if (!executablePath) {
+    throw new Error(
+      "Chrome ou Edge não encontrado. Instale o Google Chrome ou defina a variável CHROME_PATH."
+    );
+  }
+
+  const html = buildHtml(content, title, settings);
+
+  const browser = await puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "20mm", bottom: "20mm", left: "0mm", right: "0mm" },
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
 }
 
 module.exports = { markdownToPdf };
