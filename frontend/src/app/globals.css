@@ -13,3 +13,97 @@
     margin: 1.5cm;
   }
 }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+   CSS outside @layer always wins over Tailwind utilities inside @layer, so
+   these overrides work on every component without touching each one.
+────────────────────────────────────────────────────────────────────────────── */
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Surfaces */
+html.dark .bg-white        { background-color: #1e293b; }
+html.dark .bg-gray-50      { background-color: #0f172a; }
+html.dark .bg-gray-100     { background-color: #334155; }
+html.dark .bg-gray-200     { background-color: #475569; }
+
+/* Text */
+html.dark .text-gray-900   { color: #f1f5f9; }
+html.dark .text-gray-800   { color: #e2e8f0; }
+html.dark .text-gray-700   { color: #cbd5e1; }
+html.dark .text-gray-600   { color: #94a3b8; }
+html.dark .text-gray-500   { color: #64748b; }
+html.dark .text-gray-400   { color: #94a3b8; }
+
+/* Borders */
+html.dark .border-gray-100  { border-color: #334155; }
+html.dark .border-gray-200  { border-color: #334155; }
+html.dark .border-gray-300  { border-color: #475569; }
+
+/* Hover states */
+html.dark .hover\:bg-gray-50:hover   { background-color: #1e293b; }
+html.dark .hover\:bg-gray-100:hover  { background-color: #334155; }
+html.dark .hover\:text-gray-900:hover { color: #f1f5f9; }
+html.dark .hover\:text-gray-700:hover { color: #cbd5e1; }
+
+/* Selected sidebar items */
+html.dark .bg-blue-100   { background-color: #1e3a5f; }
+html.dark .text-blue-700 { color: #93c5fd; }
+
+/* Status badges */
+html.dark .bg-green-100    { background-color: #14532d; }
+html.dark .text-green-700  { color: #86efac; }
+html.dark .bg-purple-100   { background-color: #3b0764; }
+html.dark .text-purple-700 { color: #d8b4fe; }
+html.dark .bg-orange-100   { background-color: #7c2d12; }
+html.dark .text-orange-700 { color: #fdba74; }
+html.dark .bg-teal-100     { background-color: #134e4a; }
+html.dark .text-teal-700   { color: #5eead4; }
+
+/* Alerts / errors */
+html.dark .bg-red-50        { background-color: #450a0a; }
+html.dark .text-red-700     { color: #fca5a5; }
+html.dark .border-red-200   { border-color: #7f1d1d; }
+
+/* Progress boxes */
+html.dark .bg-indigo-50      { background-color: #1e1b4b; }
+html.dark .border-indigo-200 { border-color: #4338ca; }
+html.dark .text-indigo-600   { color: #a5b4fc; }
+html.dark .border-blue-300   { border-color: #1e40af; }
+
+/* Code block — already dark in light mode, keep consistent */
+html.dark .bg-gray-900   { background-color: #020617; }
+html.dark .text-gray-100 { color: #f1f5f9; }
+
+/* Inputs & textareas */
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark textarea,
+html.dark select {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+html.dark input[type="text"]::placeholder,
+html.dark textarea::placeholder { color: #64748b; }
+
+/* Prose / markdown viewer */
+html.dark .prose           { color: #cbd5e1; }
+html.dark .prose h1,
+html.dark .prose h2,
+html.dark .prose h3,
+html.dark .prose h4,
+html.dark .prose h5,
+html.dark .prose h6        { color: #f1f5f9; }
+html.dark .prose strong    { color: #f1f5f9; }
+html.dark .prose a         { color: #60a5fa; }
+html.dark .prose hr        { border-color: #334155; }
+html.dark .prose blockquote { border-color: #475569; color: #94a3b8; }
+html.dark .prose code      { background-color: #334155; color: #f1f5f9; }
+html.dark .prose pre       { background-color: #1e293b; }
+html.dark .prose thead th  { background-color: #334155; color: #f1f5f9; border-color: #475569; }
+html.dark .prose tbody td  { border-color: #475569; }
+html.dark .prose tbody tr:nth-child(even) td { background-color: #1e293b; }

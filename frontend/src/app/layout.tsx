@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import ThemeToggle from "./ThemeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +28,16 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Anti-FOUC: set dark class before first paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">
         <header className="bg-white border-b border-gray-200 shadow-sm print:hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +50,7 @@ export default function RootLayout({
                   Documentador Progress 4GL
                 </span>
               </Link>
-              <nav className="flex gap-6">
+              <nav className="flex items-center gap-6">
                 <Link
                   href="/"
                   className="text-sm text-gray-600 hover:text-gray-900"
@@ -71,6 +81,7 @@ export default function RootLayout({
                 >
                   Configurações
                 </Link>
+                <ThemeToggle />
               </nav>
             </div>
           </div>
