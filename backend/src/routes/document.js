@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
 const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
@@ -8,15 +10,57 @@ const { markdownToPdf } = require("../services/pdfExport");
 
 const router = express.Router();
 
-// Jobs em memória: jobId -> { status, fileName?, documentation?, error?, createdAt }
-const jobs = new Map();
+// Jobs persistidos em disco — sobrevivem a reinicializações do servidor (node --watch, crashes, etc.)
+const JOBS_DIR = path.join(__dirname, "..", "docs", "jobs");
 
-// Limpa jobs com mais de 2 horas para não vazar memória
-function pruneJobs() {
-  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
-  for (const [id, job] of jobs.entries()) {
-    if (job.createdAt < cutoff) jobs.delete(id);
+function ensureJobsDir() {
+  fs.mkdirSync(JOBS_DIR, { recursive: true });
+}
+
+function setJob(id, data) {
+  ensureJobsDir();
+  fs.writeFileSync(
+    path.join(JOBS_DIR, `${id}.json`),
+    JSON.stringify({ ...data, updatedAt: Date.now() })
+  );
+}
+
+function getJob(id) {
+  const file = path.join(JOBS_DIR, `${id}.json`);
+  if (!fs.existsSync(file)) return null;
+  let job;
+  try {
+    job = JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch {
+    return null;
   }
+  // Job "running" sem atualização há mais de 3 min → servidor reiniciou durante o processamento
+  if (job.status === "running" && job.updatedAt && Date.now() - job.updatedAt > 3 * 60 * 1000) {
+    return {
+      ...job,
+      status: "error",
+      error: "O processamento foi interrompido (servidor reiniciou). Clique em 'Re-documentar' para tentar novamente.",
+    };
+  }
+  return job;
+}
+
+// Limpa jobs com mais de 2 horas para não acumular arquivos
+function pruneJobs() {
+  ensureJobsDir();
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  try {
+    for (const file of fs.readdirSync(JOBS_DIR)) {
+      if (!file.endsWith(".json")) continue;
+      const filePath = path.join(JOBS_DIR, file);
+      try {
+        const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        if (data.createdAt < cutoff) fs.unlinkSync(filePath);
+      } catch {
+        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore if dir doesn't exist yet */ }
 }
 
 // Documentar um arquivo específico
@@ -63,22 +107,21 @@ router.post("/project", (req, res) => {
 
   pruneJobs();
   const jobId = crypto.randomUUID();
-  jobs.set(jobId, { status: "running", createdAt: Date.now() });
+  setJob(jobId, { status: "running", percent: 0, message: "Iniciando...", createdAt: Date.now() });
 
-  // Processa em background — não bloqueia a resposta HTTP
   (async () => {
     try {
       console.log(`[job:${jobId}] Iniciando documentação de ${files.length} arquivo(s)...`);
       const markdown = await documentProject(files, ({ percent, message }) => {
-        const current = jobs.get(jobId) || {};
-        jobs.set(jobId, {
+        const current = getJob(jobId) || {};
+        setJob(jobId, {
           ...current,
           percent: percent ?? current.percent ?? 0,
           message: message ?? current.message ?? "",
         });
       });
       const doc = saveDocumentation(projectId, "_projeto", markdown);
-      jobs.set(jobId, {
+      setJob(jobId, {
         status: "done",
         percent: 100,
         message: "Documentação concluída!",
@@ -89,7 +132,7 @@ router.post("/project", (req, res) => {
       console.log(`[job:${jobId}] Concluído.`);
     } catch (err) {
       console.error(`[job:${jobId}] Erro:`, err.message);
-      jobs.set(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
+      setJob(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
     }
   })();
 
@@ -98,7 +141,7 @@ router.post("/project", (req, res) => {
 
 // Consulta status de um job (deve ficar antes de /:projectId para não colidir)
 router.get("/project/status/:jobId", (req, res) => {
-  const job = jobs.get(req.params.jobId);
+  const job = getJob(req.params.jobId);
   if (!job) return res.status(404).json({ error: "Job não encontrado" });
   res.json(job);
 });
@@ -118,24 +161,24 @@ router.post("/analyze/:projectId", (req, res) => {
 
   pruneJobs();
   const jobId = crypto.randomUUID();
-  jobs.set(jobId, { status: "running", percent: 0, message: "Iniciando análise...", createdAt: Date.now() });
+  setJob(jobId, { status: "running", percent: 0, message: "Iniciando análise...", createdAt: Date.now() });
 
   (async () => {
     try {
       const depGraph = buildDependencyGraph(files);
       const groups = await analyzeProjectGroups(files, depGraph, ({ percent, message }) => {
-        const cur = jobs.get(jobId) || {};
-        jobs.set(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
+        const cur = getJob(jobId) || {};
+        setJob(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
       });
       const analysis = saveAnalysis(projectId, groups);
-      jobs.set(jobId, {
+      setJob(jobId, {
         status: "done", percent: 100,
         message: `${groups.length} programa(s) identificado(s)!`,
         analysis,
         createdAt: Date.now(),
       });
     } catch (err) {
-      jobs.set(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
+      setJob(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
     }
   })();
 
@@ -157,7 +200,7 @@ router.post("/group", (req, res) => {
 
   pruneJobs();
   const jobId = crypto.randomUUID();
-  jobs.set(jobId, { status: "running", percent: 0, message: "Iniciando...", createdAt: Date.now() });
+  setJob(jobId, { status: "running", percent: 0, message: "Iniciando...", createdAt: Date.now() });
 
   (async () => {
     try {
@@ -167,12 +210,12 @@ router.post("/group", (req, res) => {
         groupType || "outro",
         groupDescription || "",
         ({ percent, message }) => {
-          const cur = jobs.get(jobId) || {};
-          jobs.set(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
+          const cur = getJob(jobId) || {};
+          setJob(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
         }
       );
       const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
-      jobs.set(jobId, {
+      setJob(jobId, {
         status: "done", percent: 100,
         message: "Documentação concluída!",
         fileName: doc.fileName,
@@ -180,7 +223,7 @@ router.post("/group", (req, res) => {
         createdAt: Date.now(),
       });
     } catch (err) {
-      jobs.set(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
+      setJob(jobId, { status: "error", percent: 0, message: err.message, error: err.message, createdAt: Date.now() });
     }
   })();
 

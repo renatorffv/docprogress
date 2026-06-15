@@ -111,7 +111,12 @@ export async function pollDocProject(jobId: string): Promise<{
   error?: string;
 }> {
   const res = await fetch(`${CLIENT_API}/api/document/project/status/${jobId}`);
-  if (!res.ok) throw new Error("Erro ao consultar status do job");
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Job não encontrado. O servidor pode ter reiniciado durante o processamento — clique em 'Re-documentar' para tentar novamente.");
+    }
+    throw new Error("Erro ao consultar status do job");
+  }
   return res.json();
 }
 
