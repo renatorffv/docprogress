@@ -57,7 +57,7 @@ async function documentCode(code, fileName) {
       system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages: [{
         role: "user",
-        content: `Documente o seguinte programa Progress 4GL.\n\nArquivo: ${fileName}\n\n\`\`\`progress\n${code}\n\`\`\``,
+        content: `Documente o seguinte programa Progress 4GL seguindo TODAS as seções definidas no system prompt.\n\nIMPORTANTE: Inclua obrigatoriamente:\n- "Visão Geral": explicação em linguagem de negócio, sem jargão técnico\n- "Sugestões de Melhoria": com as 4 categorias (Hard Code, Performance, Manutenibilidade, Boas Práticas)\n\nArquivo: ${fileName}\n\n\`\`\`progress\n${code}\n\`\`\``,
       }],
     }),
     null
@@ -109,7 +109,7 @@ async function documentProject(files, onProgress) {
         system: systemBlock,
         messages: [{
           role: "user",
-          content: `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\n${filesContent}`,
+          content: `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.\n\n${filesContent}`,
         }],
       }),
       report
@@ -319,7 +319,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
         system: systemBlock,
         messages: [{
           role: "user",
-          content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única. Cubra: objetivo, parâmetros, lógica principal, integração com o Datasul e observações técnicas.\n\n${filesContent}`,
+          content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."\n\n${filesContent}`,
         }],
       }),
       report
@@ -350,7 +350,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
         system: systemBlock,
         messages: [{
           role: "user",
-          content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\n${filesContent}`,
+          content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul. Inclua Visão Geral em linguagem de negócio e Sugestões de Melhoria com Hard Code, Performance, Manutenibilidade e Boas Práticas.\n\n${filesContent}`,
         }],
       }),
       report
@@ -372,7 +372,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
       system: systemBlock,
       messages: [{
         role: "user",
-        content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\n${combined}`,
+        content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nIMPORTANTE: A documentação final deve incluir obrigatoriamente:\n1. "Visão Geral": linguagem de negócio, sem jargão técnico, para o usuário final\n2. Seções técnicas consolidadas e resumidas\n3. "Sugestões de Melhoria" consolidadas com as 4 categorias: Hard Code, Performance, Manutenibilidade, Boas Práticas\n\n${combined}`,
       }],
     }),
     report

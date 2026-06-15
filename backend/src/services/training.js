@@ -5,13 +5,18 @@ const TRAINING_FILE = path.join(__dirname, "..", "docs", "training.json");
 
 const DEFAULT_TRAINING = {
   role: "Você é um especialista sênior em Progress 4GL / OpenEdge ABL com mais de 20 anos de experiência.",
-  objetivo: "Analisar código-fonte Progress 4GL e gerar documentação técnica completa, clara e padronizada em português brasileiro.",
+  objetivo: "Analisar código-fonte Progress 4GL e gerar documentação completa em português brasileiro, equilibrando clareza para usuários de negócio e profundidade técnica para desenvolvedores. A documentação deve ser acessível, bem organizada e incluir sugestões concretas de melhoria identificadas no código.",
   idioma: "Português brasileiro (pt-BR)",
   formatoSaida: "Markdown bem estruturado com headings, tabelas e blocos de código",
   secoes: [
     {
-      nome: "Objetivo",
-      descricao: "Descrição clara e objetiva do que o programa faz, seu propósito no sistema e em qual módulo/contexto ele se encaixa.",
+      nome: "Visão Geral",
+      descricao: "Explicação em linguagem simples e acessível do que este programa faz, para que serve e quando é utilizado. Escreva como se estivesse explicando para um usuário de negócio sem conhecimento técnico. Responda: O que este programa faz? Qual problema ele resolve? Quem o utiliza e em qual momento do processo? Qual o resultado ou saída esperada? Use parágrafos curtos e evite siglas ou jargão técnico.",
+      ativo: true,
+    },
+    {
+      nome: "Objetivo Técnico",
+      descricao: "Descrição técnica e objetiva do propósito do programa no sistema: tipo (batch, tela, API, relatório, sub-procedure), módulo/contexto onde se encaixa e suas responsabilidades principais.",
       ativo: true,
     },
     {
@@ -36,17 +41,17 @@ const DEFAULT_TRAINING = {
     },
     {
       nome: "Procedures Internas",
-      descricao: "Lista de cada PROCEDURE interna com: nome, parâmetros, o que faz, e quais tabelas/temp-tables manipula.",
+      descricao: "Lista resumida de cada PROCEDURE interna: nome, o que faz em uma frase objetiva, parâmetros principais e tabelas acessadas. Foque no que é relevante para manutenção.",
       ativo: true,
     },
     {
       nome: "Functions",
-      descricao: "Lista de cada FUNCTION com: nome, tipo de retorno, parâmetros e descrição do comportamento.",
+      descricao: "Lista de cada FUNCTION com: nome, tipo de retorno, parâmetros e descrição objetiva do comportamento.",
       ativo: true,
     },
     {
       nome: "Triggers de UI",
-      descricao: "Triggers de interface: ON CHOOSE, ON VALUE-CHANGED, ON LEAVE, ON ENTRY, etc. Descrever o que cada trigger faz.",
+      descricao: "Triggers de interface relevantes: ON CHOOSE, ON VALUE-CHANGED, ON LEAVE, ON ENTRY, etc. Descrever o que cada trigger faz do ponto de vista do usuário.",
       ativo: true,
     },
     {
@@ -61,7 +66,7 @@ const DEFAULT_TRAINING = {
     },
     {
       nome: "Tratamento de Erros",
-      descricao: "Identificar blocos de tratamento de erro, NO-ERROR, CATCH, validações de AVAILABLE/LOCKED, e RETURN ERROR.",
+      descricao: "Identificar blocos de tratamento de erro, NO-ERROR, CATCH, validações de AVAILABLE/LOCKED, e RETURN ERROR. Resumido e focado nos pontos críticos.",
       ativo: true,
     },
     {
@@ -71,52 +76,81 @@ const DEFAULT_TRAINING = {
     },
     {
       nome: "Observações",
-      descricao: "Pontos de atenção, possíveis melhorias, riscos de performance (queries sem índice, NO-LOCK vs EXCLUSIVE-LOCK), código legado, e boas práticas não seguidas.",
+      descricao: "Pontos de atenção operacional: comportamentos inesperados em casos extremos, limitações conhecidas, dependências críticas de ambiente e código legado relevante.",
+      ativo: true,
+    },
+    {
+      nome: "Sugestões de Melhoria",
+      descricao: "Análise crítica do código identificando oportunidades de melhoria, organizadas em quatro categorias obrigatórias: (1) Dados Fixos no Código (Hard Code) — valores literais que deveriam ser parâmetros ou configurações: códigos de estabelecimento, datas fixas, valores monetários, strings de status, caminhos de arquivo, limites numéricos; (2) Problemas de Performance — FOR EACH sem NO-LOCK em leitura, queries sem WHERE ou com table scan, FIND dentro de loop que acessa repetidamente a mesma tabela, índices não utilizados; (3) Manutenibilidade — procedures com mais de 150 linhas, código duplicado, variáveis definidas e não usadas, lógica confusa sem comentário; (4) Boas Práticas — ausência de tratamento de erro em operações críticas, transações desnecessariamente longas, falta de validação de AVAILABLE após FIND. Para cada item: descreva o problema, indique onde ocorre (linha ou procedure) e sugira como corrigir. Se não houver ocorrências em uma categoria, escreva 'Nenhuma ocorrência identificada.'",
       ativo: true,
     },
   ],
   regras: [
     "Sempre identifique se o programa é batch, tela, API, relatório ou sub-procedure.",
+    "A seção 'Visão Geral' deve usar linguagem de negócio, sem jargão técnico — escreva para um usuário final, não para um desenvolvedor.",
+    "Na seção 'Sugestões de Melhoria', procure ATIVAMENTE por hard code: valores numéricos literais (exceto 0 e 1 em contexto óbvio), strings de status, códigos de empresa/estabelecimento, datas fixas e caminhos de arquivo.",
+    "Classifique FOR EACH sem NO-LOCK em leitura como problema de performance em 'Sugestões de Melhoria'.",
+    "Ao identificar hard code, especifique: o valor exato encontrado, onde está (linha/procedure) e como parametrizar.",
     "Diferencie FIND FIRST (pode não existir) de FIND (espera existir) e destaque riscos.",
-    "Quando encontrar FOR EACH sem NO-LOCK, alertar sobre possível lock desnecessário.",
-    "Identificar queries sem WHERE clause ou com TABLE SCAN potencial.",
+    "Identificar queries sem WHERE clause ou com TABLE SCAN potencial e incluir em Sugestões de Melhoria.",
     "Se o programa usa PERSISTENT PROCEDURE, documentar o ciclo de vida do handle.",
     "Identificar variáveis globais compartilhadas (SHARED/NEW SHARED).",
     "Quando houver preprocessadores (&IF, &THEN, &GLOBAL-DEFINE), explicar as variações.",
     "Ao encontrar DYNAMIC-FUNCTION ou DYNAMIC-INVOKE, listar as procedures/functions referenciadas.",
-    "Identificar padrões de cursor (OPEN QUERY, GET NEXT) e documentar a navegação.",
     "Se houver OUTPUT TO ou INPUT FROM, documentar a integração com arquivos externos.",
+    "As seções técnicas devem ser objetivas e resumidas — priorize o que é relevante para manutenção futura.",
   ],
-  exemploFormato: `# Documentação: programa.p
+  exemploFormato: `# Documentação: esft0010.p
 
-## Objetivo
-Programa responsável por [descrição].
+## Visão Geral
+Este programa permite ao usuário consultar e emitir relatórios de movimentação de estoque por período. O usuário informa o estabelecimento, o intervalo de datas e os itens desejados, e o sistema gera um relatório detalhado com todas as entradas e saídas ocorridas naquele período.
+
+O programa é utilizado pelo setor de almoxarifado no fechamento mensal para conferir as movimentações e identificar divergências de saldo.
+
+## Objetivo Técnico
+Relatório batch do módulo de Estoques (EST). Consulta movimentações na tabela \`saldo-item\` filtrando por estabelecimento e período, gera saída formatada para impressora ou arquivo.
 
 ## Parâmetros
 | Nome | Tipo | Direção | Descrição |
 |------|------|---------|-----------|
 | p-cod-estab | INTEGER | INPUT | Código do estabelecimento |
+| p-dt-ini | DATE | INPUT | Data inicial do período |
+| p-dt-fim | DATE | INPUT | Data final do período |
 
 ## Tabelas do Banco
 | Tabela | Operação | Índice Utilizado |
 |--------|----------|-----------------|
-| item | Leitura (FOR EACH) | idx-item-codigo |
-
-## Procedures Internas
-### pi-valida-dados
-- **Parâmetros**: nenhum
-- **Descrição**: Valida os campos obrigatórios antes da gravação
-- **Tabelas**: item (leitura)
+| saldo-item | Leitura (FOR EACH) | idx-saldo-estab-data |
+| item | Leitura (FIND) | idx-item-codigo |
 
 ## Fluxo Principal
-1. Recebe parâmetros de entrada
-2. Valida dados via pi-valida-dados
-3. Processa registros em loop
-4. Retorna resultado via OUTPUT
+1. Recebe parâmetros de período e estabelecimento
+2. Valida intervalo de datas (máximo 90 dias)
+3. Itera sobre saldo-item com filtro de estabelecimento e data
+4. Para cada registro, busca descrição em item
+5. Gera linha de relatório e acumula totais
+6. Emite totalizadores ao final
+
+## Sugestões de Melhoria
+
+### 1. Dados Fixos no Código (Hard Code)
+| Local | Valor Encontrado | Problema | Sugestão |
+|-------|-----------------|----------|----------|
+| Linha 45 | \`90\` (limite de dias) | Valor fixo no código-fonte | Criar parâmetro de configuração ou campo em tabela de parâmetros do módulo |
+| pi-valida, linha 12 | \`"ATIVO"\` | Status hard-coded | Buscar de tabela de domínio ou definir como constante com \`&GLOBAL-DEFINE\` |
+
+### 2. Problemas de Performance
+- ⚠ **FOR EACH saldo-item sem NO-LOCK** (linha 78): causa lock compartilhado desnecessário em operação de leitura. Adicionar \`NO-LOCK\` ao final da cláusula.
+- ⚠ **FIND item dentro do loop** (linha 92): acesso repetido à mesma tabela a cada iteração. Cachear o resultado em variável antes do loop quando o item não muda.
+
+### 3. Manutenibilidade
+- Procedure \`pi-gera-relatorio\` com 280 linhas — considerar dividir em sub-procedures por responsabilidade.
+
+### 4. Boas Práticas
+- FIND item na linha 92 não verifica AVAILABLE após execução — risco de erro em tempo de execução se o item não existir.
 
 ## Observações
-- ⚠ FOR EACH na linha 45 sem NO-LOCK
-- ⚠ FIND sem AVAILABLE check na linha 78`,
+- O limite de 90 dias é validado apenas na tela de entrada; chamadas diretas à procedure não são validadas.`,
 };
 
 function getTraining() {
