@@ -64,13 +64,44 @@ async function generateSuggestions(files, programName, report) {
       system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages: [{
         role: "user",
-        content: `Analise o código abaixo do programa "${programName}" e gere SOMENTE a seção "## Sugestões de Melhoria" em Markdown com as 4 subseções:\n\n### 1. Dados Fixos no Código (Hard Code)\n### 2. Problemas de Performance\n### 3. Manutenibilidade\n### 4. Boas Práticas\n\nPara cada item encontrado: descreva o problema, indique onde ocorre (linha ou procedure) e sugira como corrigir. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${truncated ? "\n\n⚠ Análise baseada nos primeiros ~35.000 tokens do arquivo." : ""}\n\n### Arquivo: ${firstFile.name}\n\`\`\`progress\n${codePreview}\n\`\`\``,
+        content: `Analise o código abaixo do programa "${programName}" e gere SOMENTE a seção de sugestões de melhoria em Markdown.
+
+FORMATO OBRIGATÓRIO — copie exatamente estes cabeçalhos:
+
+## Sugestões de Melhoria
+
+### 1. Dados Fixos no Código (Hard Code)
+
+### 2. Problemas de Performance
+
+### 3. Manutenibilidade
+
+### 4. Boas Práticas
+
+REGRAS DE FORMATAÇÃO:
+- O cabeçalho principal deve ser EXATAMENTE "## Sugestões de Melhoria" (dois # apenas, sem nenhum # extra antes)
+- Use tabelas Markdown com separadores válidos: |---|---|---|---| (traços contínuos, sem espaços)
+- Para listas use "- " no início de cada linha
+- Para negrito use **texto**
+- Para código inline use \`valor\`
+- Se não houver ocorrências em uma categoria, escreva: Nenhuma ocorrência identificada.
+${truncated ? "\n⚠ Análise baseada nos primeiros ~35.000 tokens do arquivo." : ""}
+
+### Arquivo: ${firstFile.name}
+\`\`\`progress
+${codePreview}
+\`\`\``,
       }],
     }),
     report
   );
 
-  return "\n\n---\n\n" + message.content[0].text;
+  // Limpa possíveis variações de heading malformado (ex: "# ## Sugestões" → "## Sugestões")
+  const text = message.content[0].text
+    .replace(/^#\s+(#{1,3}\s+Sugestões)/m, "$1")
+    .trim();
+
+  return "\n\n---\n\n" + text;
 }
 
 async function documentCode(code, fileName) {
