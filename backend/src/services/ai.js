@@ -47,6 +47,32 @@ async function sleepWithCountdown(totalMs, onTick) {
   }
 }
 
+// Gera APENAS a seção "Sugestões de Melhoria" quando o doc principal ficou sem tokens
+// Usa somente o primeiro chunk do código para não estourar o rate limit
+async function generateSuggestions(files, programName, report) {
+  const systemPrompt = buildSystemPrompt();
+  const firstFile = files[0];
+  const codePreview = firstFile.content.substring(0, MAX_CHUNK_CHARS);
+  const truncated = firstFile.content.length > MAX_CHUNK_CHARS;
+
+  report?.({ message: "Gerando sugestões de melhoria (análise complementar)..." });
+
+  const message = await callWithRetry(
+    () => client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 4096,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{
+        role: "user",
+        content: `Analise o código abaixo do programa "${programName}" e gere SOMENTE a seção "## Sugestões de Melhoria" em Markdown com as 4 subseções:\n\n### 1. Dados Fixos no Código (Hard Code)\n### 2. Problemas de Performance\n### 3. Manutenibilidade\n### 4. Boas Práticas\n\nPara cada item encontrado: descreva o problema, indique onde ocorre (linha ou procedure) e sugira como corrigir. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${truncated ? "\n\n⚠ Análise baseada nos primeiros ~35.000 tokens do arquivo." : ""}\n\n### Arquivo: ${firstFile.name}\n\`\`\`progress\n${codePreview}\n\`\`\``,
+      }],
+    }),
+    report
+  );
+
+  return "\n\n---\n\n" + message.content[0].text;
+}
+
 async function documentCode(code, fileName) {
   const systemPrompt = buildSystemPrompt();
 
@@ -63,7 +89,16 @@ async function documentCode(code, fileName) {
     null
   );
 
-  return message.content[0].text;
+  const markdown = message.content[0].text;
+
+  // Se o limite de tokens cortou o doc antes de chegar em "Sugestões de Melhoria", gera em chamada separada
+  if (!markdown.includes("Sugestões de Melhoria")) {
+    await sleep(5_000); // pequena pausa para não estourar rate limit
+    const suggestions = await generateSuggestions([{ name: fileName, content: code }], fileName, null);
+    return markdown + suggestions;
+  }
+
+  return markdown;
 }
 
 function splitIntoChunks(files) {
@@ -326,7 +361,16 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
     );
 
     report({ percent: 95, message: "Salvando documentação..." });
-    return message.content[0].text;
+    const markdown = message.content[0].text;
+
+    if (!markdown.includes("Sugestões de Melhoria")) {
+      report({ percent: 96, message: "Gerando sugestões de melhoria (análise complementar)..." });
+      await sleep(5_000);
+      const suggestions = await generateSuggestions(groupFiles, groupName, report);
+      return markdown + suggestions;
+    }
+
+    return markdown;
   }
 
   // Múltiplos lotes
@@ -377,8 +421,18 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
     }),
     report
   );
+  const finalDoc = synthesis.content[0].text;
+
+  if (!finalDoc.includes("Sugestões de Melhoria")) {
+    report({ percent: 98, message: "Gerando sugestões de melhoria (análise complementar)..." });
+    await sleep(5_000);
+    const suggestions = await generateSuggestions(groupFiles, groupName, report);
+    report({ percent: 99, message: "Salvando..." });
+    return finalDoc + suggestions;
+  }
+
   report({ percent: 98, message: "Salvando..." });
-  return synthesis.content[0].text;
+  return finalDoc;
 }
 
 module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup };
