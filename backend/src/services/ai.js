@@ -47,6 +47,37 @@ async function sleepWithCountdown(totalMs, onTick) {
   }
 }
 
+// Mensagens rotativas exibidas enquanto a API processa (dão percepção de atividade ao usuário)
+const TICKER_MESSAGES = [
+  "Analisando estrutura do programa...",
+  "Identificando procedimentos e funções...",
+  "Mapeando tabelas e dependências...",
+  "Documentando fluxo de execução...",
+  "Identificando hard code e problemas de performance...",
+  "Elaborando sugestões de melhoria...",
+  "Consolidando análise do código...",
+  "Gerando documentação técnica...",
+];
+
+// Incrementa o progresso gradualmente enquanto asyncFn executa, para evitar aparência de travamento.
+// Avança 1% a cada intervalMs ms, até o teto endPercent.
+async function withTicker(asyncFn, report, startPercent, endPercent, intervalMs = 2_000) {
+  let current = startPercent;
+  let tick = 0;
+  const timer = setInterval(() => {
+    tick++;
+    if (current < endPercent) {
+      current++;
+      report?.({ percent: current, message: TICKER_MESSAGES[Math.floor(tick / 3) % TICKER_MESSAGES.length] });
+    }
+  }, intervalMs);
+  try {
+    return await asyncFn();
+  } finally {
+    clearInterval(timer);
+  }
+}
+
 // Gera APENAS a seção "Sugestões de Melhoria" quando o doc principal ficou sem tokens
 // Usa somente o primeiro chunk do código para não estourar o rate limit
 async function generateSuggestions(files, programName, report) {
@@ -378,17 +409,21 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
 
     report({ percent: 20, message: `Documentando ${groupFiles.length} arquivo(s) do programa...` });
 
-    const message = await callWithRetry(
-      () => client.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 8192,
-        system: systemBlock,
-        messages: [{
-          role: "user",
-          content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."\n\n${filesContent}`,
-        }],
-      }),
-      report
+    // withTicker avança de 20% → 85% durante a chamada à API (evita aparência de travamento)
+    const message = await withTicker(
+      () => callWithRetry(
+        () => client.messages.create({
+          model: "claude-haiku-4-5",
+          max_tokens: 8192,
+          system: systemBlock,
+          messages: [{
+            role: "user",
+            content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."\n\n${filesContent}`,
+          }],
+        }),
+        report
+      ),
+      report, 20, 85
     );
 
     report({ percent: 95, message: "Salvando documentação..." });
@@ -414,21 +449,26 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
         report({ percent: basePercent, message: `Lote ${i} concluído — aguardando ${remaining}s...` });
       });
     }
-    report({ percent: basePercent + 5, message: `Documentando lote ${i + 1} de ${chunks.length}...` });
+    const chunkStart = basePercent + 5;
+    const chunkEnd = Math.min(Math.round(10 + ((i + 1) / totalSteps) * 70) - 3, 80);
+    report({ percent: chunkStart, message: `Documentando lote ${i + 1} de ${chunks.length}...` });
     const filesContent = chunks[i].files
       .map((f) => `### Arquivo: ${f.name}\n\`\`\`progress\n${f.content}\n\`\`\``)
       .join("\n\n");
-    const message = await callWithRetry(
-      () => client.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 8192,
-        system: systemBlock,
-        messages: [{
-          role: "user",
-          content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul. Inclua Visão Geral em linguagem de negócio e Sugestões de Melhoria com Hard Code, Performance, Manutenibilidade e Boas Práticas.\n\n${filesContent}`,
-        }],
-      }),
-      report
+    const message = await withTicker(
+      () => callWithRetry(
+        () => client.messages.create({
+          model: "claude-haiku-4-5",
+          max_tokens: 8192,
+          system: systemBlock,
+          messages: [{
+            role: "user",
+            content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul. Inclua Visão Geral em linguagem de negócio e Sugestões de Melhoria com Hard Code, Performance, Manutenibilidade e Boas Práticas.\n\n${filesContent}`,
+          }],
+        }),
+        report
+      ),
+      report, chunkStart, chunkEnd
     );
     chunkDocs.push(message.content[0].text);
   }
@@ -440,17 +480,20 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
 
   report({ percent: 87, message: "Gerando documentação consolidada do programa..." });
   const combined = chunkDocs.map((d, i) => `## Parte ${i + 1}\n\n${d}`).join("\n\n---\n\n");
-  const synthesis = await callWithRetry(
-    () => client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 8192,
-      system: systemBlock,
-      messages: [{
-        role: "user",
-        content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nIMPORTANTE: A documentação final deve incluir obrigatoriamente:\n1. "Visão Geral": linguagem de negócio, sem jargão técnico, para o usuário final\n2. Seções técnicas consolidadas e resumidas\n3. "Sugestões de Melhoria" consolidadas com as 4 categorias: Hard Code, Performance, Manutenibilidade, Boas Práticas\n\n${combined}`,
-      }],
-    }),
-    report
+  const synthesis = await withTicker(
+    () => callWithRetry(
+      () => client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 8192,
+        system: systemBlock,
+        messages: [{
+          role: "user",
+          content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nIMPORTANTE: A documentação final deve incluir obrigatoriamente:\n1. "Visão Geral": linguagem de negócio, sem jargão técnico, para o usuário final\n2. Seções técnicas consolidadas e resumidas\n3. "Sugestões de Melhoria" consolidadas com as 4 categorias: Hard Code, Performance, Manutenibilidade, Boas Práticas\n\n${combined}`,
+        }],
+      }),
+      report
+    ),
+    report, 87, 96
   );
   const finalDoc = synthesis.content[0].text;
 
