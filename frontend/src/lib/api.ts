@@ -48,8 +48,11 @@ export async function fetchSettings() {
   return res.json();
 }
 
-// Client-side functions — usa NEXT_PUBLIC_API_URL se definido (produção), senão localhost
-const CLIENT_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// Client-side: usa URL relativa para passar pelo proxy do Vercel (evita mixed-content HTTPS→HTTP)
+// Em desenvolvimento local continua apontando direto para localhost:3001
+const CLIENT_API = typeof window !== "undefined" && window.location.protocol === "https:"
+  ? ""
+  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001");
 
 export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();
