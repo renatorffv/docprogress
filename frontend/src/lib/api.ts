@@ -1,49 +1,62 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "http://localhost:3001";
 
+// Lê o token JWT do cookie para chamadas SSR (Server Components não têm localStorage)
+async function ssrAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    const token = store.get("auth_token")?.value;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchProjects() {
-  const res = await fetch(`${API_URL}/api/projects`, { cache: "no-store" });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/projects`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar projetos");
   return res.json();
 }
 
 export async function fetchProject(id: string) {
-  const res = await fetch(`${API_URL}/api/projects/${id}`, {
-    cache: "no-store",
-  });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/projects/${id}`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Projeto não encontrado");
   return res.json();
 }
 
 export async function fetchProjectFiles(id: string) {
-  const res = await fetch(`${API_URL}/api/projects/${id}/files`, {
-    cache: "no-store",
-  });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/projects/${id}/files`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar arquivos");
   return res.json();
 }
 
 export async function fetchDocumentation(projectId: string) {
-  const res = await fetch(`${API_URL}/api/document/${projectId}`, {
-    cache: "no-store",
-  });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/document/${projectId}`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar documentação");
   return res.json();
 }
 
 export async function fetchTraining() {
-  const res = await fetch(`${API_URL}/api/training`, { cache: "no-store" });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/training`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar treinamento");
   return res.json();
 }
 
 export async function fetchTrainingPreview() {
-  const res = await fetch(`${API_URL}/api/training/preview`, { cache: "no-store" });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/training/preview`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar preview");
   return res.json();
 }
 
 export async function fetchSettings() {
-  const res = await fetch(`${API_URL}/api/settings`, { cache: "no-store" });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/settings`, { cache: "no-store", headers });
   if (!res.ok) throw new Error("Falha ao buscar configurações");
   return res.json();
 }
@@ -188,7 +201,8 @@ export async function renameProject(projectId: string, name: string) {
 }
 
 export async function fetchAnalysis(projectId: string) {
-  const res = await fetch(`${API_URL}/api/document/analysis/${projectId}`, { cache: "no-store" });
+  const headers = await ssrAuthHeader();
+  const res = await fetch(`${API_URL}/api/document/analysis/${projectId}`, { cache: "no-store", headers });
   if (!res.ok) return null;
   return res.json();
 }
