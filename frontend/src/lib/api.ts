@@ -1,4 +1,4 @@
-const API_URL = process.env.API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "http://localhost:3001";
 
 export async function fetchProjects() {
   const res = await fetch(`${API_URL}/api/projects`, { cache: "no-store" });
@@ -48,8 +48,8 @@ export async function fetchSettings() {
   return res.json();
 }
 
-// Client-side functions
-const CLIENT_API = "http://localhost:3001";
+// Client-side functions — usa NEXT_PUBLIC_API_URL se definido (produção), senão localhost
+const CLIENT_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();

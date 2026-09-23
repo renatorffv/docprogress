@@ -13,7 +13,8 @@ const settingsRoutes = require("./routes/settings");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: "http://localhost:3000" }));
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000").split(",").map(s => s.trim());
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "50mb" }));
 
 // Garantir que os diretórios existam
