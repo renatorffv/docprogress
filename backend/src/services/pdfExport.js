@@ -2,10 +2,18 @@ const puppeteer = require("puppeteer-core");
 const { marked } = require("marked");
 const fs = require("fs");
 
-// ── Locate system Chrome / Edge on Windows ──────────────────────────────────
+// ── Locate system Chrome / Edge (Windows + Linux) ───────────────────────────
 function findBrowserPath() {
   const candidates = [
     process.env.CHROME_PATH,
+    // Linux (VPS / servidor)
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+    "/usr/local/bin/chromium",
+    // Windows
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files\\Google\\Chrome Beta\\Application\\chrome.exe",
@@ -174,7 +182,14 @@ async function markdownToPdf(content, title, settings) {
   const browser = await puppeteer.launch({
     executablePath,
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-gpu",
+      "--disable-dev-shm-usage",
+      "--disable-extensions",
+      "--single-process",
+    ],
   });
 
   try {
