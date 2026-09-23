@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setAuth } from "@/lib/auth";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "";
+// Usa URL relativa para passar pelo proxy do Vercel (evita mixed-content HTTPS→HTTP)
+const API = typeof window !== "undefined" && window.location.protocol === "https:" ? "" : (process.env.NEXT_PUBLIC_API_URL || "");
 
 export default function LoginPage() {
   const router = useRouter();
