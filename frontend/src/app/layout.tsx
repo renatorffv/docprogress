@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import Image from "next/image";
 import ThemeToggle from "./ThemeToggle";
 import NavUser from "./NavUser";
 import "./globals.css";
@@ -44,9 +45,7 @@ export default function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <Link href="/" className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">P4</span>
-                </div>
+                <Image src="/logo.png" alt="Logo" width={40} height={40} className="object-contain" />
                 <span className="font-semibold text-lg">
                   Documentador Progress 4GL
                 </span>
