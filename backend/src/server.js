@@ -9,6 +9,8 @@ const documentRoutes = require("./routes/document");
 const projectRoutes = require("./routes/project");
 const trainingRoutes = require("./routes/training");
 const settingsRoutes = require("./routes/settings");
+const authRoutes = require("./routes/auth");
+const { requireAuth } = require("./middleware/auth");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,15 +25,17 @@ const docsDir = path.join(__dirname, "docs");
 fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(docsDir, { recursive: true });
 
+// Rotas públicas (sem autenticação)
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+app.use("/api/auth", authRoutes);
+
+// Todas as demais rotas exigem token JWT
+app.use(requireAuth);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/document", documentRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/settings", settingsRoutes);
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
 
 app.listen(PORT, () => {
   console.log(`Backend rodando em http://localhost:${PORT}`);

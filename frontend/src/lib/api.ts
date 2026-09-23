@@ -54,6 +54,16 @@ const CLIENT_API = typeof window !== "undefined" && window.location.protocol ===
   ? ""
   : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001");
 
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("auth_token");
+}
+
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
+
 export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
@@ -63,6 +73,7 @@ export async function uploadFiles(files: File[] | FileList, name?: string) {
   const res = await fetch(`${CLIENT_API}/api/upload`, {
     method: "POST",
     body: formData,
+    headers: authHeaders(),
   });
   if (!res.ok) {
     let msg = "Falha no upload";
@@ -80,7 +91,7 @@ export async function uploadFiles(files: File[] | FileList, name?: string) {
 export async function generateDocFile(projectId: string, fileName: string) {
   const res = await fetch(`${CLIENT_API}/api/document/file`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ projectId, fileName }),
   });
   if (!res.ok) {
@@ -93,7 +104,7 @@ export async function generateDocFile(projectId: string, fileName: string) {
 export async function startDocProject(projectId: string): Promise<string> {
   const res = await fetch(`${CLIENT_API}/api/document/project`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ projectId }),
   });
   if (!res.ok) {
@@ -113,7 +124,9 @@ export async function pollDocProject(jobId: string): Promise<{
   documentation?: string;
   error?: string;
 }> {
-  const res = await fetch(`${CLIENT_API}/api/document/project/status/${jobId}`);
+  const res = await fetch(`${CLIENT_API}/api/document/project/status/${jobId}`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) {
     if (res.status === 404) {
       throw new Error("Job não encontrado. O servidor pode ter reiniciado durante o processamento — clique em 'Re-documentar' para tentar novamente.");
@@ -137,7 +150,7 @@ export async function generateDocProject(projectId: string) {
 export async function saveTraining(data: unknown) {
   const res = await fetch(`${CLIENT_API}/api/training`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -150,13 +163,16 @@ export async function saveTraining(data: unknown) {
 export async function resetTraining() {
   const res = await fetch(`${CLIENT_API}/api/training/reset`, {
     method: "POST",
+    headers: authHeaders(),
   });
   if (!res.ok) throw new Error("Falha ao resetar treinamento");
   return res.json();
 }
 
 export async function fetchTrainingPreviewClient() {
-  const res = await fetch(`${CLIENT_API}/api/training/preview`);
+  const res = await fetch(`${CLIENT_API}/api/training/preview`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) throw new Error("Falha ao buscar preview");
   return res.json();
 }
@@ -164,7 +180,7 @@ export async function fetchTrainingPreviewClient() {
 export async function renameProject(projectId: string, name: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/name`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error("Falha ao renomear projeto");
@@ -178,7 +194,10 @@ export async function fetchAnalysis(projectId: string) {
 }
 
 export async function startAnalysis(projectId: string): Promise<string> {
-  const res = await fetch(`${CLIENT_API}/api/document/analyze/${projectId}`, { method: "POST" });
+  const res = await fetch(`${CLIENT_API}/api/document/analyze/${projectId}`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
   if (!res.ok) throw new Error("Falha ao iniciar análise");
   const { jobId } = await res.json();
   return jobId;
@@ -194,7 +213,7 @@ export async function startDocGroup(
 ): Promise<string> {
   const res = await fetch(`${CLIENT_API}/api/document/group`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ projectId, groupId, fileNames, groupName, groupType, groupDescription }),
   });
   if (!res.ok) {
@@ -209,7 +228,7 @@ export async function startDocGroup(
 export async function saveCompanySettings(data: unknown) {
   const res = await fetch(`${CLIENT_API}/api/settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
