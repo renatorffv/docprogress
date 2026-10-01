@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
-const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis } = require("../services/storage");
+const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
@@ -215,6 +215,7 @@ router.post("/group", (req, res) => {
         }
       );
       const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
+      clearNeedsRedoc(projectId, fileNames);
       setJob(jobId, {
         status: "done", percent: 100,
         message: "Documentação concluída!",

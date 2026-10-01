@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { generateDocFile, startDocProject, pollDocProject, renameProject } from "@/lib/api";
 import { authHeader } from "@/lib/auth";
 import ProgramsTab from "./ProgramsTab";
+import UpdateSourcesModal from "./UpdateSourcesModal";
 
 interface ProjectDetailProps {
   projectId: string;
@@ -13,7 +14,7 @@ interface ProjectDetailProps {
     id: string;
     name?: string | null;
     createdAt: string;
-    files: { name: string; size: number }[];
+    files: { name: string; size: number; needsRedoc?: boolean }[];
   };
   files: { name: string; content: string; lines: number }[];
   initialDocs: { fileName: string; content: string }[];
@@ -42,6 +43,10 @@ export default function ProjectDetail({
   const [savingName, setSavingName] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [needsRedocFiles, setNeedsRedocFiles] = useState<Set<string>>(
+    () => new Set(project.files.filter((f) => f.needsRedoc).map((f) => f.name))
+  );
 
   async function handleDownload(path: string, filename: string) {
     try {
@@ -230,15 +235,32 @@ export default function ProjectDetail({
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <button
-            onClick={handleDocumentProject}
-            disabled={loading !== null}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
-          >
-            {loading === "__project__" ? "Documentando..." : "Documentar Projeto Inteiro"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowUpdateModal(true)}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Atualizar Fontes
+              {needsRedocFiles.size > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
+                  {needsRedocFiles.size}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleDocumentProject}
+              disabled={loading !== null}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              {loading === "__project__" ? "Documentando..." : "Documentar Projeto Inteiro"}
+            </button>
+          </div>
 
           {loading === "__project__" && jobProgress && (
+
             <div className="w-72 bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-xs font-medium text-gray-700">Progresso</span>
@@ -301,6 +323,14 @@ export default function ProjectDetail({
           projectId={projectId}
           initialAnalysis={initialAnalysis as never}
           existingDocs={docs}
+          needsRedocFiles={needsRedocFiles}
+          onGroupDocumented={(fileNames) => {
+            setNeedsRedocFiles((prev) => {
+              const next = new Set(prev);
+              fileNames.forEach((f) => next.delete(f));
+              return next;
+            });
+          }}
           onDocCreated={(fileName, content, autoNavigate = true) => {
             setDocs((prev) => {
               const idx = prev.findIndex((d) => d.fileName === fileName);
@@ -469,6 +499,21 @@ export default function ProjectDetail({
           )}
         </div>
       </div>
+      )}
+
+      {showUpdateModal && (
+        <UpdateSourcesModal
+          projectId={projectId}
+          onClose={() => setShowUpdateModal(false)}
+          onDone={(result) => {
+            setNeedsRedocFiles((prev) => {
+              const next = new Set(prev);
+              result.added.forEach((f) => next.add(f));
+              result.changed.forEach((f) => next.add(f));
+              return next;
+            });
+          }}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const { saveProject } = require("../services/storage");
+const { saveProject, updateProjectFiles } = require("../services/storage");
 
 const router = express.Router();
 
@@ -41,6 +41,22 @@ router.post("/", (req, res) => {
       });
     } catch (saveErr) {
       res.status(500).json({ error: saveErr.message });
+    }
+  });
+});
+
+// POST /api/upload/:projectId/update — atualiza fontes de um projeto existente
+router.post("/:projectId/update", (req, res) => {
+  upload.array("files", 1000)(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    try {
+      if (!req.files || req.files.length === 0)
+        return res.status(400).json({ error: "Nenhum arquivo enviado" });
+
+      const result = updateProjectFiles(req.params.projectId, req.files);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
   });
 });

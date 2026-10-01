@@ -190,6 +190,24 @@ export async function fetchTrainingPreviewClient() {
   return res.json();
 }
 
+export async function updateProjectFiles(
+  projectId: string,
+  files: File[] | FileList
+): Promise<{ added: string[]; changed: string[]; affectedGroups: string[] }> {
+  const formData = new FormData();
+  for (let i = 0; i < files.length; i++) formData.append("files", files[i]);
+  const res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
+    method: "POST",
+    body: formData,
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Falha na atualização");
+  }
+  return res.json();
+}
+
 export async function renameProject(projectId: string, name: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/name`, {
     method: "PATCH",

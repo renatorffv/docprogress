@@ -21,6 +21,8 @@ interface Props {
   projectId: string;
   initialAnalysis: Analysis | null;
   existingDocs: { fileName: string }[];
+  needsRedocFiles?: Set<string>;
+  onGroupDocumented?: (fileNames: string[]) => void;
   onDocCreated: (fileName: string, content: string, autoNavigate?: boolean) => void;
 }
 
@@ -48,7 +50,7 @@ const TYPE_ICON: Record<string, string> = {
   outro: "📄",
 };
 
-export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, onDocCreated }: Props) {
+export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, needsRedocFiles, onGroupDocumented, onDocCreated }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(initialAnalysis);
   const [analysisJob, setAnalysisJob] = useState<{ percent: number; message: string } | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
         async (result) => {
           setGroupJobs((p) => ({ ...p, [group.id]: null }));
           onDocCreated(result.fileName as string, result.documentation as string, navigate);
+          onGroupDocumented?.(group.files);
         }
       );
     } catch (err) {
@@ -196,9 +199,17 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
             const job = groupJobs[group.id];
             const err = groupErrors[group.id];
             const documented = docFileForGroup(group.id);
+            const hasChangedFiles = needsRedocFiles && group.files.some((f) => needsRedocFiles.has(f));
 
             return (
-              <div key={group.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition">
+              <div
+                key={group.id}
+                className={`bg-white rounded-xl p-5 hover:shadow-sm transition ${
+                  hasChangedFiles
+                    ? "border-2 border-yellow-400"
+                    : "border border-gray-200"
+                }`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -207,16 +218,28 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLOR[group.type] ?? TYPE_COLOR.outro}`}>
                         {TYPE_LABEL[group.type] ?? "Programa"}
                       </span>
-                      {documented && (
+                      {documented && !hasChangedFiles && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
                           ✓ Documentado
+                        </span>
+                      )}
+                      {hasChangedFiles && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex items-center gap-1">
+                          ⚠ Fontes alteradas — re-documentar
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-gray-500 mb-3">{group.description}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {group.files.map((f) => (
-                        <span key={f} className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                        <span
+                          key={f}
+                          className={`text-xs font-mono px-2 py-0.5 rounded ${
+                            needsRedocFiles?.has(f)
+                              ? "bg-yellow-100 text-yellow-700 font-semibold"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
                           {f}
                         </span>
                       ))}

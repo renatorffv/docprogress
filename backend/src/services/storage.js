@@ -1,8 +1,13 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
 const DOCS_DIR = path.join(__dirname, "..", "docs");
+
+function computeHash(filePath) {
+  return crypto.createHash("md5").update(fs.readFileSync(filePath)).digest("hex");
+}
 
 function saveProject(projectId, files, name) {
   const projectDir = path.join(UPLOADS_DIR, projectId);
@@ -15,6 +20,10 @@ function saveProject(projectId, files, name) {
     files: [],
   };
 
+  const lastModifiedMap = (() => {
+    try { return JSON.parse(files[0]?.fieldname === "files" && "{}"); } catch { return {}; }
+  })();
+
   for (const file of files) {
     const filePath = path.join(projectDir, file.originalname);
     fs.copyFileSync(file.path, filePath);
@@ -22,6 +31,10 @@ function saveProject(projectId, files, name) {
       name: file.originalname,
       size: file.size,
       path: filePath,
+      contentHash: computeHash(filePath),
+      uploadedAt: new Date().toISOString(),
+      needsRedoc: false,
+      changedAt: null,
     });
     fs.unlinkSync(file.path);
   }
@@ -32,6 +45,82 @@ function saveProject(projectId, files, name) {
   );
 
   return manifest;
+}
+
+// Atualiza fontes existentes e adiciona novos. Retorna { added, changed, affected }
+function updateProjectFiles(projectId, newFiles) {
+  const manifest = getProject(projectId);
+  if (!manifest) throw new Error("Projeto não encontrado");
+
+  const projectDir = path.join(UPLOADS_DIR, projectId);
+  const now = new Date().toISOString();
+  const added = [];
+  const changed = [];
+
+  for (const file of newFiles) {
+    const destPath = path.join(projectDir, file.originalname);
+    fs.copyFileSync(file.path, destPath);
+    const newHash = computeHash(destPath);
+    fs.unlinkSync(file.path);
+
+    const existing = manifest.files.find((f) => f.name === file.originalname);
+    if (!existing) {
+      // Arquivo novo
+      manifest.files.push({
+        name: file.originalname,
+        size: file.size,
+        path: destPath,
+        contentHash: newHash,
+        uploadedAt: now,
+        needsRedoc: true,
+        changedAt: now,
+      });
+      added.push(file.originalname);
+    } else if (existing.contentHash !== newHash) {
+      // Arquivo alterado
+      existing.size = file.size;
+      existing.contentHash = newHash;
+      existing.needsRedoc = true;
+      existing.changedAt = now;
+      changed.push(file.originalname);
+    }
+    // hash igual = sem alteração, ignora
+  }
+
+  // Descobrir grupos afetados usando a análise existente
+  const analysis = getAnalysis(projectId);
+  const affectedGroups = [];
+  if (analysis && analysis.groups) {
+    const modifiedFiles = new Set([...added, ...changed]);
+    for (const group of analysis.groups) {
+      const hits = (group.fileNames || group.files || []).filter((fn) => modifiedFiles.has(fn));
+      if (hits.length > 0) affectedGroups.push(group.id || group.name);
+    }
+  }
+
+  manifest.updatedAt = now;
+  fs.writeFileSync(
+    path.join(projectDir, "manifest.json"),
+    JSON.stringify(manifest, null, 2)
+  );
+
+  return { added, changed, affectedGroups };
+}
+
+// Limpa needsRedoc dos arquivos de um grupo após re-documentar
+function clearNeedsRedoc(projectId, fileNames) {
+  const manifest = getProject(projectId);
+  if (!manifest) return;
+  for (const file of manifest.files) {
+    if (fileNames.includes(file.name)) {
+      file.needsRedoc = false;
+      file.changedAt = null;
+    }
+  }
+  fs.writeFileSync(
+    path.join(UPLOADS_DIR, projectId, "manifest.json"),
+    JSON.stringify(manifest, null, 2)
+  );
 }
 
 function saveDocumentation(projectId, fileName, markdown) {
@@ -119,6 +208,8 @@ function getAnalysis(projectId) {
 
 module.exports = {
   saveProject,
+  updateProjectFiles,
+  clearNeedsRedoc,
   saveDocumentation,
   getProject,
   getProjectFiles,
