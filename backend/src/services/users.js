@@ -46,4 +46,12 @@ async function validateUser(email, password) {
   return { id: user.id, name: user.name, email: user.email };
 }
 
-module.exports = { createUser, validateUser, findByEmail };
+function deleteUser(id) {
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) throw new Error("Usuário não encontrado");
+  users.splice(idx, 1);
+  saveUsers(users);
+}
+
+module.exports = { createUser, validateUser, findByEmail, getUsers, deleteUser };

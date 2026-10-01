@@ -10,6 +10,7 @@ const projectRoutes = require("./routes/project");
 const trainingRoutes = require("./routes/training");
 const settingsRoutes = require("./routes/settings");
 const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/admin");
 const { requireAuth } = require("./middleware/auth");
 
 const app = express();
@@ -36,6 +37,7 @@ app.use("/api/document", documentRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.listen(PORT, () => {
   console.log(`Backend rodando em http://localhost:${PORT}`);
