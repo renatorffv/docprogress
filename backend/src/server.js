@@ -32,6 +32,23 @@ app.use("/api/auth", authRoutes);
 
 // Todas as demais rotas exigem token JWT
 app.use(requireAuth);
+
+// Troca de senha do usuário logado
+const { changePassword } = require("./services/users");
+app.post("/api/auth/change-password", async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias" });
+    if (newPassword.length < 6)
+      return res.status(400).json({ error: "Nova senha deve ter pelo menos 6 caracteres" });
+    await changePassword(req.user.id, currentPassword, newPassword);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.use("/api/upload", uploadRoutes);
 app.use("/api/document", documentRoutes);
 app.use("/api/projects", projectRoutes);

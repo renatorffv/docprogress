@@ -13,7 +13,9 @@ interface User {
 export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
   const [users, setUsers] = useState(initialUsers);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [resetting, setResetting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tempPasswords, setTempPasswords] = useState<Record<string, string>>({});
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Remover o usuário "${name}"? Esta ação não pode ser desfeita.`)) return;
@@ -24,15 +26,34 @@ export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
         method: "DELETE",
         headers: authHeader(),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao remover usuário");
-      }
+      if (!res.ok) throw new Error((await res.json()).error || "Erro ao remover");
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  async function handleReset(id: string, name: string) {
+    if (!confirm(`Redefinir a senha de "${name}"? Uma senha temporária será gerada.`)) return;
+    setResetting(id);
+    setError(null);
+    // gera senha aleatória: 4 palavras/segmentos legíveis
+    const tmp = Math.random().toString(36).slice(2, 6).toUpperCase() +
+      "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+    try {
+      const res = await fetch(`/api/admin/users/${id}/reset-password`, {
+        method: "POST",
+        headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ password: tmp }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Erro ao redefinir");
+      setTempPasswords((prev) => ({ ...prev, [id]: tmp }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setResetting(null);
     }
   }
 
@@ -44,7 +65,7 @@ export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Usuários Cadastrados</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -68,6 +89,7 @@ export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Nome</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">E-mail</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Cadastro</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Senha temp.</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -85,15 +107,40 @@ export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3 text-gray-500">{formatDate(u.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(u.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    {tempPasswords[u.id] ? (
+                      <span className="inline-flex items-center gap-1.5 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded font-mono">
+                        {tempPasswords[u.id]}
+                        <button
+                          onClick={() => navigator.clipboard.writeText(tempPasswords[u.id])}
+                          title="Copiar"
+                          className="text-yellow-600 hover:text-yellow-900"
+                        >
+                          📋
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(u.id, u.name)}
-                      disabled={deleting === u.id}
-                      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 transition"
-                    >
-                      {deleting === u.id ? "Removendo..." : "Remover"}
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => handleReset(u.id, u.name)}
+                        disabled={resetting === u.id}
+                        className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50 transition"
+                      >
+                        {resetting === u.id ? "Gerando..." : "Redefinir senha"}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(u.id, u.name)}
+                        disabled={deleting === u.id}
+                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 transition"
+                      >
+                        {deleting === u.id ? "Removendo..." : "Remover"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -101,6 +148,11 @@ export default function UsersAdmin({ initialUsers }: { initialUsers: User[] }) {
           </table>
         </div>
       )}
+
+      <p className="text-xs text-gray-400 mt-4">
+        Após redefinir, compartilhe a senha temporária com o usuário. Ele poderá trocá-la em{" "}
+        <strong>Minha Conta</strong>.
+      </p>
     </div>
   );
 }

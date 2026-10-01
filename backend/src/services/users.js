@@ -54,4 +54,22 @@ function deleteUser(id) {
   saveUsers(users);
 }
 
-module.exports = { createUser, validateUser, findByEmail, getUsers, deleteUser };
+async function resetPassword(id, newPassword) {
+  const users = getUsers();
+  const user = users.find((u) => u.id === id);
+  if (!user) throw new Error("Usuário não encontrado");
+  user.password = await bcrypt.hash(newPassword, 10);
+  saveUsers(users);
+}
+
+async function changePassword(id, currentPassword, newPassword) {
+  const users = getUsers();
+  const user = users.find((u) => u.id === id);
+  if (!user) throw new Error("Usuário não encontrado");
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) throw new Error("Senha atual incorreta");
+  user.password = await bcrypt.hash(newPassword, 10);
+  saveUsers(users);
+}
+
+module.exports = { createUser, validateUser, findByEmail, getUsers, deleteUser, resetPassword, changePassword };
