@@ -137,7 +137,16 @@ function saveDocumentation(projectId, fileName, markdown) {
 function getProject(projectId) {
   const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
   if (!fs.existsSync(manifestPath)) return null;
-  return JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  // Projetos antigos não têm uploadedAt — preenche com mtime do arquivo
+  for (const file of manifest.files) {
+    if (!file.uploadedAt && file.path) {
+      try {
+        file.uploadedAt = fs.statSync(file.path).mtime.toISOString();
+      } catch { /* arquivo pode não existir mais */ }
+    }
+  }
+  return manifest;
 }
 
 function getProjectFiles(projectId) {
