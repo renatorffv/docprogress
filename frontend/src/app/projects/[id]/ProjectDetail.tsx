@@ -51,7 +51,11 @@ export default function ProjectDetail({
   async function handleDownload(path: string, filename: string) {
     try {
       const res = await fetch(path, { headers: authHeader() });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      if (!res.ok) {
+        let msg = `Erro ${res.status}`;
+        try { const e = await res.json(); msg = e.error || msg; } catch { /* ignore */ }
+        throw new Error(msg);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
