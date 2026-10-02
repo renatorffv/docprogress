@@ -371,7 +371,7 @@ export default function ProjectDetail({
               {showDownloadMenu && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
                   <button
-                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=docx`, `${projectId}-docs.docx`); }}
+                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=docx`, `documentacoes_word.zip`); }}
                     className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition w-full text-left"
                   >
                     <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -380,7 +380,7 @@ export default function ProjectDetail({
                     Word (.docx)
                   </button>
                   <button
-                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=pdf`, `${projectId}-docs.pdf`); }}
+                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=pdf`, `documentacoes_pdf.zip`); }}
                     className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100 w-full text-left"
                   >
                     <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
