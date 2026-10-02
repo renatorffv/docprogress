@@ -242,16 +242,18 @@ router.get("/:projectId/export/all", async (req, res) => {
     const settings = getSettings();
     const JSZip = require("jszip");
     const zip = new JSZip();
+    const now = new Date();
+    const dateSuffix = `${String(now.getDate()).padStart(2,"0")}${String(now.getMonth()+1).padStart(2,"0")}${now.getFullYear()}`;
 
     for (const doc of docs) {
       const title = doc.fileName.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
       const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
       if (format === "pdf") {
         const buffer = await markdownToPdf(doc.content, title, settings);
-        zip.file(`${safeName}.pdf`, buffer);
+        zip.file(`${safeName}-${dateSuffix}.pdf`, buffer);
       } else {
         const buffer = await markdownToDocx(doc.content, title, settings);
-        zip.file(`${safeName}.docx`, buffer);
+        zip.file(`${safeName}-${dateSuffix}.docx`, buffer);
       }
     }
 
@@ -279,8 +281,10 @@ router.get("/:projectId/export/docx", async (req, res) => {
     const title = doc.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
     const buffer = await markdownToDocx(found.content, title, settings);
     const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
+    const now = new Date();
+    const dateSuffix = `${String(now.getDate()).padStart(2,"0")}${String(now.getMonth()+1).padStart(2,"0")}${now.getFullYear()}`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.docx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}-${dateSuffix}.docx"`);
     res.send(buffer);
   } catch (err) {
     console.error("Erro ao gerar Word:", err);
