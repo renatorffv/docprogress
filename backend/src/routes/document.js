@@ -244,7 +244,7 @@ router.get("/:projectId/export/all", async (req, res) => {
     const zip = new JSZip();
 
     for (const doc of docs) {
-      const title = doc.fileName.replace(/\.md$/, "");
+      const title = doc.fileName.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
       const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
       if (format === "pdf") {
         const buffer = await markdownToPdf(doc.content, title, settings);
@@ -276,7 +276,7 @@ router.get("/:projectId/export/docx", async (req, res) => {
 
   try {
     const settings = getSettings();
-    const title = doc.replace(/\.md$/, "");
+    const title = doc.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
     const buffer = await markdownToDocx(found.content, title, settings);
     const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
