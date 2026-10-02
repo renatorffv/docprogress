@@ -6,6 +6,16 @@ const { saveProject, updateProjectFiles } = require("../services/storage");
 
 const router = express.Router();
 
+// Converte o JSON de metadados do browser em { filename: lastModified }
+function parseMetaMap(raw) {
+  try {
+    const arr = JSON.parse(raw || "[]");
+    return Object.fromEntries(arr.map((m) => [m.name, m.lastModified]));
+  } catch {
+    return {};
+  }
+}
+
 const upload = multer({
   dest: path.join(__dirname, "..", "uploads", "tmp"),
   fileFilter: (req, file, cb) => {
@@ -32,7 +42,8 @@ router.post("/", (req, res) => {
 
       const projectId = uuidv4();
       const name = typeof req.body.name === "string" ? req.body.name.trim() : null;
-      const manifest = saveProject(projectId, req.files, name || null);
+      const metaMap = parseMetaMap(req.body.filesMetadata);
+      const manifest = saveProject(projectId, req.files, name || null, metaMap);
 
       res.json({
         projectId,
@@ -53,7 +64,8 @@ router.post("/:projectId/update", (req, res) => {
       if (!req.files || req.files.length === 0)
         return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
-      const result = updateProjectFiles(req.params.projectId, req.files);
+      const metaMap = parseMetaMap(req.body.filesMetadata);
+      const result = updateProjectFiles(req.params.projectId, req.files, metaMap);
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });

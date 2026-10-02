@@ -14,7 +14,7 @@ interface ProjectDetailProps {
     id: string;
     name?: string | null;
     createdAt: string;
-    files: { name: string; size: number; needsRedoc?: boolean; uploadedAt?: string; changedAt?: string | null }[];
+    files: { name: string; size: number; needsRedoc?: boolean; uploadedAt?: string; changedAt?: string | null; fileModifiedAt?: string | null }[];
   };
   files: { name: string; content: string; lines: number }[];
   initialDocs: { fileName: string; content: string }[];
@@ -424,13 +424,14 @@ export default function ProjectDetail({
                     }
                     const mA = project.files.find((f) => f.name === a.name);
                     const mB = project.files.find((f) => f.name === b.name);
-                    const dA = new Date(mA?.changedAt || mA?.uploadedAt || 0).getTime();
-                    const dB = new Date(mB?.changedAt || mB?.uploadedAt || 0).getTime();
+                    const dA = new Date(mA?.fileModifiedAt || mA?.changedAt || mA?.uploadedAt || 0).getTime();
+                    const dB = new Date(mB?.fileModifiedAt || mB?.changedAt || mB?.uploadedAt || 0).getTime();
                     return fileSort.dir === "asc" ? dA - dB : dB - dA;
                   })
                   .map((file) => {
                     const meta = project.files.find((f) => f.name === file.name);
-                    const dateStr = meta?.changedAt || meta?.uploadedAt;
+                    // Preferência: data real do arquivo > data de re-upload > data de upload inicial
+                    const displayDate = meta?.fileModifiedAt || meta?.changedAt || meta?.uploadedAt;
                     const isChanged = !!meta?.changedAt;
                     return (
                       <li key={file.name}>
@@ -444,10 +445,10 @@ export default function ProjectDetail({
                         >
                           <span className="font-mono block">{file.name}</span>
                           <span className="text-xs text-gray-400">{file.lines} linhas</span>
-                          {dateStr && (
+                          {displayDate && (
                             <span className={`text-xs block mt-0.5 ${isChanged ? "text-yellow-600" : "text-gray-400"}`}>
-                              {isChanged ? "Alterado " : "Enviado "}
-                              {new Date(dateStr).toLocaleDateString("pt-BR")}
+                              {meta?.fileModifiedAt ? "Modificado " : isChanged ? "Alterado " : "Enviado "}
+                              {new Date(displayDate).toLocaleDateString("pt-BR")}
                             </span>
                           )}
                         </button>

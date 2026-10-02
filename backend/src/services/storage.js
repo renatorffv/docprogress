@@ -9,7 +9,7 @@ function computeHash(filePath) {
   return crypto.createHash("md5").update(fs.readFileSync(filePath)).digest("hex");
 }
 
-function saveProject(projectId, files, name) {
+function saveProject(projectId, files, name, metaMap = {}) {
   const projectDir = path.join(UPLOADS_DIR, projectId);
   fs.mkdirSync(projectDir, { recursive: true });
 
@@ -20,19 +20,17 @@ function saveProject(projectId, files, name) {
     files: [],
   };
 
-  const lastModifiedMap = (() => {
-    try { return JSON.parse(files[0]?.fieldname === "files" && "{}"); } catch { return {}; }
-  })();
-
   for (const file of files) {
     const filePath = path.join(projectDir, file.originalname);
     fs.copyFileSync(file.path, filePath);
+    const lastMod = metaMap[file.originalname];
     manifest.files.push({
       name: file.originalname,
       size: file.size,
       path: filePath,
       contentHash: computeHash(filePath),
       uploadedAt: new Date().toISOString(),
+      fileModifiedAt: lastMod ? new Date(lastMod).toISOString() : null,
       needsRedoc: false,
       changedAt: null,
     });
@@ -48,7 +46,7 @@ function saveProject(projectId, files, name) {
 }
 
 // Atualiza fontes existentes e adiciona novos. Retorna { added, changed, affected }
-function updateProjectFiles(projectId, newFiles) {
+function updateProjectFiles(projectId, newFiles, metaMap = {}) {
   const manifest = getProject(projectId);
   if (!manifest) throw new Error("Projeto não encontrado");
 
@@ -63,23 +61,26 @@ function updateProjectFiles(projectId, newFiles) {
     const newHash = computeHash(destPath);
     fs.unlinkSync(file.path);
 
+    const lastMod = metaMap[file.originalname];
+    const fileModifiedAt = lastMod ? new Date(lastMod).toISOString() : null;
+
     const existing = manifest.files.find((f) => f.name === file.originalname);
     if (!existing) {
-      // Arquivo novo
       manifest.files.push({
         name: file.originalname,
         size: file.size,
         path: destPath,
         contentHash: newHash,
         uploadedAt: now,
+        fileModifiedAt,
         needsRedoc: true,
         changedAt: now,
       });
       added.push(file.originalname);
     } else if (existing.contentHash !== newHash) {
-      // Arquivo alterado
       existing.size = file.size;
       existing.contentHash = newHash;
+      existing.fileModifiedAt = fileModifiedAt;
       existing.needsRedoc = true;
       existing.changedAt = now;
       changed.push(file.originalname);

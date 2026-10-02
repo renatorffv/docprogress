@@ -79,9 +79,12 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
 
 export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();
+  const meta: { name: string; lastModified: number }[] = [];
   for (let i = 0; i < files.length; i++) {
     formData.append("files", files[i]);
+    meta.push({ name: files[i].name, lastModified: files[i].lastModified });
   }
+  formData.append("filesMetadata", JSON.stringify(meta));
   if (name) formData.append("name", name);
   const res = await fetch(`${CLIENT_API}/api/upload`, {
     method: "POST",
@@ -195,7 +198,12 @@ export async function updateProjectFiles(
   files: File[] | FileList
 ): Promise<{ added: string[]; changed: string[]; affectedGroups: string[] }> {
   const formData = new FormData();
-  for (let i = 0; i < files.length; i++) formData.append("files", files[i]);
+  const meta: { name: string; lastModified: number }[] = [];
+  for (let i = 0; i < files.length; i++) {
+    formData.append("files", files[i]);
+    meta.push({ name: files[i].name, lastModified: files[i].lastModified });
+  }
+  formData.append("filesMetadata", JSON.stringify(meta));
   const res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
     method: "POST",
     body: formData,
