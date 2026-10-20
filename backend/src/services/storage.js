@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { createPatch } = require("diff");
 
 const UPLOADS_DIR = path.join(__dirname, "..", "uploads");
 const DOCS_DIR = path.join(__dirname, "..", "docs");
@@ -57,14 +58,20 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
 
   for (const file of newFiles) {
     const destPath = path.join(projectDir, file.originalname);
+    const lastMod = metaMap[file.originalname];
+    const fileModifiedAt = lastMod ? new Date(lastMod).toISOString() : null;
+    const existing = manifest.files.find((f) => f.name === file.originalname);
+
+    // Lê conteúdo antigo ANTES de sobrescrever (necessário para calcular diff)
+    let oldContent = null;
+    if (existing && fs.existsSync(destPath)) {
+      try { oldContent = fs.readFileSync(destPath, "utf-8"); } catch { /* ignora */ }
+    }
+
     fs.copyFileSync(file.path, destPath);
     const newHash = computeHash(destPath);
     fs.unlinkSync(file.path);
 
-    const lastMod = metaMap[file.originalname];
-    const fileModifiedAt = lastMod ? new Date(lastMod).toISOString() : null;
-
-    const existing = manifest.files.find((f) => f.name === file.originalname);
     if (!existing) {
       manifest.files.push({
         name: file.originalname,
@@ -75,9 +82,20 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
         fileModifiedAt,
         needsRedoc: true,
         changedAt: now,
+        diffPatch: null,
       });
       added.push(file.originalname);
     } else if (existing.contentHash !== newHash) {
+      // Calcula diff entre conteúdo antigo e novo
+      if (oldContent !== null) {
+        try {
+          const newContent = fs.readFileSync(destPath, "utf-8");
+          const raw = createPatch(file.originalname, oldContent, newContent, "", "");
+          existing.diffPatch = raw.length > 8000 ? raw.slice(0, 8000) + "\n...(diff truncado)" : raw;
+        } catch {
+          existing.diffPatch = null;
+        }
+      }
       existing.size = file.size;
       existing.contentHash = newHash;
       existing.fileModifiedAt = fileModifiedAt;
@@ -116,6 +134,7 @@ function clearNeedsRedoc(projectId, fileNames) {
     if (fileNames.includes(file.name)) {
       file.needsRedoc = false;
       file.changedAt = null;
+      file.diffPatch = null;
     }
   }
   fs.writeFileSync(

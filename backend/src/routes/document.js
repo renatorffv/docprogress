@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
-const { getProjectFiles, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc } = require("../services/storage");
+const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
@@ -204,6 +204,14 @@ router.post("/group", (req, res) => {
 
   (async () => {
     try {
+      const manifest = getProject(projectId);
+      const changedFiles = fileNames
+        .map((name) => {
+          const mf = manifest?.files?.find((f) => f.name === name);
+          return mf?.diffPatch ? { name: mf.name, diffPatch: mf.diffPatch } : null;
+        })
+        .filter(Boolean);
+
       const markdown = await documentGroup(
         groupFiles,
         groupName || groupId,
@@ -212,7 +220,8 @@ router.post("/group", (req, res) => {
         ({ percent, message }) => {
           const cur = getJob(jobId) || {};
           setJob(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
-        }
+        },
+        changedFiles
       );
       const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
       clearNeedsRedoc(projectId, fileNames);

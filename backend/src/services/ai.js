@@ -381,10 +381,23 @@ Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
   }
 }
 
+function buildChangedFilesSection(changedFiles) {
+  if (!changedFiles || changedFiles.length === 0) return "";
+  let s = "\n\nATENCAO ARQUIVOS MODIFICADOS RECENTEMENTE:\n";
+  s += "Inclua OBRIGATORIAMENTE uma secao '## Alteracoes Recentes' na documentacao com:\n";
+  s += "- Resumo em linguagem de negocio do que mudou\n";
+  s += "- Referencia as linhas ou trechos modificados\n";
+  s += "- Impacto funcional esperado\n\n";
+  for (const cf of changedFiles) {
+    s += `### Diff de ${cf.name}:\n\`\`\`diff\n${cf.diffPatch}\n\`\`\`\n\n`;
+  }
+  return s;
+}
+
 /**
- * Documenta um conjunto de arquivos como um único programa Datasul.
+ * Documenta um conjunto de arquivos como um unico programa Datasul.
  */
-async function documentGroup(groupFiles, groupName, groupType, groupDescription, onProgress) {
+async function documentGroup(groupFiles, groupName, groupType, groupDescription, onProgress, changedFiles = []) {
   const report = (data) => onProgress?.(data);
   const systemPrompt = buildSystemPrompt();
   const systemBlock = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
@@ -410,6 +423,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
     report({ percent: 20, message: `Documentando ${groupFiles.length} arquivo(s) do programa...` });
 
     // withTicker avança de 20% → 85% durante a chamada à API (evita aparência de travamento)
+    const changeSection = buildChangedFilesSection(changedFiles);
     const message = await withTicker(
       () => callWithRetry(
         () => client.messages.create({
@@ -418,7 +432,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
           system: systemBlock,
           messages: [{
             role: "user",
-            content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."\n\n${filesContent}`,
+            content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${changeSection}\n\n${filesContent}`,
           }],
         }),
         report
