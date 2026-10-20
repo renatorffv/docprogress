@@ -61,7 +61,7 @@ const DEFAULT_TRAINING = {
     },
     {
       nome: "Dependências Externas",
-      descricao: "Programas chamados via RUN programa.p ou RUN VALUE(var). Indicar se é PERSISTENT, se passa parâmetros e o propósito da chamada.",
+      descricao: "Programas chamados via RUN programa.p ou RUN VALUE(var). Indicar se é PERSISTENT, se passa parâmetros e o propósito da chamada. IMPORTANTE: programas com extensão .py NÃO são scripts Python — no ambiente Datasul, arquivos .py são programas Progress 4GL do produto padrão (APIs ou Business Objects do Datasul). Identificá-los como 'API ou BO do produto padrão Datasul', nunca como 'Python' ou 'API Python'.",
       ativo: true,
     },
     {
@@ -87,6 +87,7 @@ const DEFAULT_TRAINING = {
   ],
   regras: [
     "Sempre identifique se o programa é batch, tela, API, relatório ou sub-procedure.",
+    "Arquivos com extensão .py encontrados em chamadas RUN NÃO são scripts Python. No ambiente Datasul/Progress 4GL, a extensão .py identifica APIs ou Business Objects (BOs) do produto padrão Datasul. Ao documentar essas chamadas, descreva-as como 'API do produto padrão Datasul' ou 'BO do produto padrão Datasul', informando o nome do programa e o propósito da chamada — jamais mencione Python, scripts Python ou qualquer tecnologia Python.",
     "A seção 'Visão Geral' deve usar linguagem de negócio, sem jargão técnico — escreva para um usuário final, não para um desenvolvedor.",
     "Na seção 'Sugestões de Melhoria', procure ATIVAMENTE por hard code: valores numéricos literais (exceto 0 e 1 em contexto óbvio), strings de status, códigos de empresa/estabelecimento, datas fixas e caminhos de arquivo.",
     "Classifique FOR EACH sem NO-LOCK em leitura como problema de performance em 'Sugestões de Melhoria'.",
