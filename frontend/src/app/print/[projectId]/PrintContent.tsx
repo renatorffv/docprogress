@@ -7,10 +7,12 @@ interface Props {
   docName: string;
   content: string;
   settings: { companyName: string; logoBase64: string | null };
+  projectName?: string | null;
 }
 
-export default function PrintContent({ docName, content, settings }: Props) {
-  const hasHeader = !!(settings.logoBase64 || settings.companyName);
+export default function PrintContent({ docName, content, settings, projectName }: Props) {
+  const displayName = projectName || settings.companyName;
+  const hasHeader = !!(settings.logoBase64 || displayName);
   const title = docName.replace(/\.md$/, "");
 
   return (
@@ -43,6 +45,7 @@ export default function PrintContent({ docName, content, settings }: Props) {
           <DocumentBody
             hasHeader={hasHeader}
             settings={settings}
+            displayName={displayName}
             title={title}
             content={content}
           />
@@ -55,29 +58,31 @@ export default function PrintContent({ docName, content, settings }: Props) {
 function DocumentBody({
   hasHeader,
   settings,
+  displayName,
   title,
   content,
 }: {
   hasHeader: boolean;
   settings: { companyName: string; logoBase64: string | null };
+  displayName: string;
   title: string;
   content: string;
 }) {
   return (
     <div>
-      {/* Cabeçalho com logo e nome da empresa */}
+      {/* Cabeçalho com logo e nome do projeto (ou empresa) */}
       {hasHeader && (
         <div className="flex items-center gap-5 pb-6 mb-8 border-b-2 border-gray-800">
           {settings.logoBase64 && (
             <img
               src={settings.logoBase64}
-              alt="Logo da empresa"
+              alt="Logo"
               className="max-h-16 max-w-[200px] object-contain"
             />
           )}
-          {settings.companyName && (
+          {displayName && (
             <span className="text-xl font-bold text-gray-800">
-              {settings.companyName}
+              {displayName}
             </span>
           )}
         </div>

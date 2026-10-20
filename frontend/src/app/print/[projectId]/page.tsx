@@ -50,11 +50,14 @@ export default async function PrintPage({ params, searchParams }: Props) {
     );
   }
 
+  const projectName = (project as { name?: string | null })?.name || null;
+
   return (
     <PrintContent
       docName={doc}
       content={docContent}
       settings={settings}
+      projectName={projectName}
     />
   );
 }
