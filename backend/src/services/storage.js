@@ -221,6 +221,26 @@ function renameProject(projectId, name) {
   return manifest;
 }
 
+function saveProjectDescription(projectId, description) {
+  const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  manifest.description = description || null;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
+function updateGroupDescription(projectId, groupId, description) {
+  const analysisPath = path.join(DOCS_DIR, projectId, "_analysis.json");
+  if (!fs.existsSync(analysisPath)) return null;
+  const data = JSON.parse(fs.readFileSync(analysisPath, "utf-8"));
+  const group = data.groups?.find((g) => g.id === groupId);
+  if (!group) return null;
+  group.description = typeof description === "string" ? description : group.description;
+  fs.writeFileSync(analysisPath, JSON.stringify(data, null, 2));
+  return group;
+}
+
 function saveAnalysis(projectId, groups) {
   const docDir = path.join(DOCS_DIR, projectId);
   fs.mkdirSync(docDir, { recursive: true });
@@ -245,6 +265,8 @@ module.exports = {
   getDocumentation,
   listProjects,
   renameProject,
+  saveProjectDescription,
+  updateGroupDescription,
   saveAnalysis,
   getAnalysis,
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { startAnalysis, startDocGroup, pollDocProject } from "@/lib/api";
+import { startAnalysis, startDocGroup, pollDocProject, saveGroupDescription } from "@/lib/api";
 
 interface Group {
   id: string;
@@ -58,9 +58,25 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
   const [groupJobs, setGroupJobs] = useState<Record<string, { percent: number; message: string } | null>>({});
   const [groupErrors, setGroupErrors] = useState<Record<string, string | null>>({});
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [editingDesc, setEditingDesc] = useState<string | null>(null);
+  const [descDraft, setDescDraft] = useState<string>("");
 
   function docFileForGroup(groupId: string) {
     return existingDocs.find((d) => d.fileName === `_grp_${groupId}.md`);
+  }
+
+  async function handleSaveGroupDesc(group: Group) {
+    try {
+      await saveGroupDescription(projectId, group.id, descDraft);
+      setAnalysis((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          groups: prev.groups.map((g) => g.id === group.id ? { ...g, description: descDraft } : g),
+        };
+      });
+    } catch { /* silently ignore */ }
+    finally { setEditingDesc(null); }
   }
 
   async function handleAnalyze() {
@@ -229,7 +245,45 @@ export default function ProgramsTab({ projectId, initialAnalysis, existingDocs, 
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500 mb-3">{group.description}</p>
+                    {editingDesc === group.id ? (
+                      <div className="mb-3">
+                        <textarea
+                          autoFocus
+                          rows={3}
+                          value={descDraft}
+                          onChange={(e) => setDescDraft(e.target.value)}
+                          className="w-full border border-blue-400 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          placeholder="Descreva o contexto deste programa para enriquecer a documentação..."
+                        />
+                        <div className="flex gap-1.5 mt-1">
+                          <button
+                            onClick={() => handleSaveGroupDesc(group)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition"
+                          >
+                            Salvar
+                          </button>
+                          <button
+                            onClick={() => setEditingDesc(null)}
+                            className="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded text-xs transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-1 mb-3 group/desc">
+                        <p className="text-sm text-gray-500 flex-1">{group.description}</p>
+                        <button
+                          onClick={() => { setEditingDesc(group.id); setDescDraft(group.description); }}
+                          className="p-1 text-gray-300 hover:text-gray-500 rounded opacity-0 group-hover/desc:opacity-100 transition shrink-0 mt-0.5"
+                          title="Editar descrição"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1.5">
                       {group.files.map((f) => (
                         <span

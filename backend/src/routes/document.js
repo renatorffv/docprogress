@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
-const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc } = require("../services/storage");
+const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc, updateGroupDescription } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
@@ -111,8 +111,10 @@ router.post("/project", (req, res) => {
 
   (async () => {
     try {
+      const projectMeta = getProject(projectId);
+      const projectDescription = projectMeta?.description || null;
       console.log(`[job:${jobId}] Iniciando documentação de ${files.length} arquivo(s)...`);
-      const markdown = await documentProject(files, ({ percent, message }) => {
+      const markdown = await documentProject(files, projectDescription, ({ percent, message }) => {
         const current = getJob(jobId) || {};
         setJob(jobId, {
           ...current,
@@ -299,6 +301,14 @@ router.get("/:projectId/export/docx", async (req, res) => {
     console.error("Erro ao gerar Word:", err);
     res.status(500).json({ error: "Falha ao gerar arquivo Word: " + err.message });
   }
+});
+
+// Atualiza descrição de um grupo na análise
+router.patch("/analysis/:projectId/groups/:groupId", (req, res) => {
+  const { description } = req.body;
+  const group = updateGroupDescription(req.params.projectId, req.params.groupId, description);
+  if (!group) return res.status(404).json({ error: "Grupo ou análise não encontrado" });
+  res.json({ id: group.id, description: group.description });
 });
 
 // Buscar documentação existente

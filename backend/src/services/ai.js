@@ -183,8 +183,11 @@ function splitIntoChunks(files) {
   return chunks;
 }
 
-async function documentProject(files, onProgress) {
+async function documentProject(files, projectDescription, onProgress) {
   const report = (data) => onProgress?.(data);
+  const descContext = projectDescription
+    ? `\n\nCONTEXTO DO PROJETO (informado pelo usuário — use para enriquecer a documentação):\n${projectDescription}\n`
+    : "";
   const systemPrompt = buildSystemPrompt();
   const systemBlock = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
 
@@ -206,7 +209,7 @@ async function documentProject(files, onProgress) {
         system: systemBlock,
         messages: [{
           role: "user",
-          content: `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.\n\n${filesContent}`,
+          content: `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.${descContext}\n\n${filesContent}`,
         }],
       }),
       report
@@ -287,7 +290,7 @@ async function documentProject(files, onProgress) {
       system: systemBlock,
       messages: [{
         role: "user",
-        content: `Com base nas documentações parciais abaixo (${chunks.length} lotes, ${files.length} arquivos no total), crie uma documentação consolidada do projeto Progress 4GL. Descreva a arquitetura geral, as interdependências entre os módulos e um resumo executivo do sistema.\n\n${combined}`,
+        content: `Com base nas documentações parciais abaixo (${chunks.length} lotes, ${files.length} arquivos no total), crie uma documentação consolidada do projeto Progress 4GL. Descreva a arquitetura geral, as interdependências entre os módulos e um resumo executivo do sistema.${descContext}\n\n${combined}`,
       }],
     }),
     report

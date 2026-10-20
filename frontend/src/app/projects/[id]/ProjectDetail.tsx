@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateDocFile, startDocProject, pollDocProject, renameProject } from "@/lib/api";
+import { generateDocFile, startDocProject, pollDocProject, renameProject, saveProjectDescription } from "@/lib/api";
 import { authHeader } from "@/lib/auth";
 import ProgramsTab from "./ProgramsTab";
 import UpdateSourcesModal from "./UpdateSourcesModal";
@@ -13,6 +13,7 @@ interface ProjectDetailProps {
   project: {
     id: string;
     name?: string | null;
+    description?: string | null;
     createdAt: string;
     files: { name: string; size: number; needsRedoc?: boolean; uploadedAt?: string; changedAt?: string | null; fileModifiedAt?: string | null }[];
   };
@@ -48,6 +49,9 @@ export default function ProjectDetail({
   const [needsRedocFiles, setNeedsRedocFiles] = useState<Set<string>>(
     () => new Set(project.files.filter((f) => f.needsRedoc).map((f) => f.name))
   );
+  const [projectDescription, setProjectDescription] = useState(project.description || "");
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [savingDescription, setSavingDescription] = useState(false);
 
   async function handleDownload(path: string, filename: string) {
     try {
@@ -97,6 +101,15 @@ export default function ProjectDetail({
   function handleNameKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") handleSaveName();
     if (e.key === "Escape") { setProjectName(project.name || ""); setEditingName(false); }
+  }
+
+  async function handleSaveDescription() {
+    setSavingDescription(true);
+    try {
+      await saveProjectDescription(projectId, projectDescription);
+      setEditingDescription(false);
+    } catch { /* silently ignore */ }
+    finally { setSavingDescription(false); }
   }
 
   async function handleDocumentFile(fileName: string) {
@@ -238,6 +251,49 @@ export default function ProjectDetail({
             Criado em{" "}
             {new Date(project.createdAt).toLocaleDateString("pt-BR")}
           </p>
+          {/* Descrição/contexto do projeto */}
+          <div className="mt-2">
+            {editingDescription ? (
+              <div className="flex flex-col gap-1.5">
+                <textarea
+                  autoFocus
+                  rows={3}
+                  value={projectDescription}
+                  onChange={(e) => setProjectDescription(e.target.value)}
+                  placeholder="Descreva o contexto do projeto para enriquecer a documentação da IA..."
+                  className="border border-blue-400 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-80 resize-none"
+                />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleSaveDescription}
+                    disabled={savingDescription}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => { setProjectDescription(project.description || ""); setEditingDescription(false); }}
+                    className="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded text-xs transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingDescription(true)}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition group"
+                title="Adicionar contexto para a IA"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                {projectDescription
+                  ? <span className="text-gray-600 italic max-w-xs truncate">{projectDescription}</span>
+                  : <span className="group-hover:underline">Adicionar contexto do projeto</span>}
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
