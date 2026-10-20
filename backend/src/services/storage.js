@@ -221,6 +221,15 @@ function renameProject(projectId, name) {
   return manifest;
 }
 
+function saveProjectLogo(projectId, logoBase64) {
+  const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  manifest.logoBase64 = logoBase64 || null;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
 function saveProjectDescription(projectId, description) {
   const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
   if (!fs.existsSync(manifestPath)) return null;
@@ -265,6 +274,7 @@ module.exports = {
   getDocumentation,
   listProjects,
   renameProject,
+  saveProjectLogo,
   saveProjectDescription,
   updateGroupDescription,
   saveAnalysis,

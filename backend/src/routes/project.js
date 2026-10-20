@@ -1,5 +1,5 @@
 const express = require("express");
-const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription } = require("../services/storage");
+const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription, saveProjectLogo } = require("../services/storage");
 
 const router = express.Router();
 
@@ -42,6 +42,13 @@ router.patch("/:id/description", (req, res) => {
   const manifest = saveProjectDescription(req.params.id, typeof description === "string" ? description.trim() : null);
   if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
   res.json({ id: manifest.id, description: manifest.description });
+});
+
+router.patch("/:id/logo", (req, res) => {
+  const { logoBase64 } = req.body;
+  const manifest = saveProjectLogo(req.params.id, logoBase64 || null);
+  if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
+  res.json({ id: manifest.id, hasLogo: !!manifest.logoBase64 });
 });
 
 module.exports = router;

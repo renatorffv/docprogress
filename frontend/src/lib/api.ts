@@ -216,6 +216,16 @@ export async function updateProjectFiles(
   return res.json();
 }
 
+export async function saveProjectLogo(projectId: string, logoBase64: string | null) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/logo`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ logoBase64 }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar logo");
+  return res.json();
+}
+
 export async function saveProjectDescription(projectId: string, description: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/description`, {
     method: "PATCH",

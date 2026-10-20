@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateDocFile, startDocProject, pollDocProject, renameProject, saveProjectDescription } from "@/lib/api";
+import { generateDocFile, startDocProject, pollDocProject, renameProject, saveProjectDescription, saveProjectLogo } from "@/lib/api";
 import { authHeader } from "@/lib/auth";
 import ProgramsTab from "./ProgramsTab";
 import UpdateSourcesModal from "./UpdateSourcesModal";
@@ -14,6 +14,7 @@ interface ProjectDetailProps {
     id: string;
     name?: string | null;
     description?: string | null;
+    logoBase64?: string | null;
     createdAt: string;
     files: { name: string; size: number; needsRedoc?: boolean; uploadedAt?: string; changedAt?: string | null; fileModifiedAt?: string | null }[];
   };
@@ -52,6 +53,8 @@ export default function ProjectDetail({
   const [projectDescription, setProjectDescription] = useState(project.description || "");
   const [editingDescription, setEditingDescription] = useState(false);
   const [savingDescription, setSavingDescription] = useState(false);
+  const [projectLogo, setProjectLogo] = useState<string | null>(project.logoBase64 || null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function handleDownload(path: string, filename: string) {
     try {
@@ -110,6 +113,38 @@ export default function ProjectDetail({
       setEditingDescription(false);
     } catch { /* silently ignore */ }
     finally { setSavingDescription(false); }
+  }
+
+  function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      // Redimensiona para max 400x120 via canvas para evitar manifests muito grandes
+      const img = new Image();
+      img.onload = async () => {
+        const maxW = 400, maxH = 120;
+        let { width, height } = img;
+        const ratio = Math.min(maxW / width, maxH / height, 1);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/png");
+        setProjectLogo(compressed);
+        try { await saveProjectLogo(projectId, compressed); } catch { /* ignore */ }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function handleRemoveLogo() {
+    setProjectLogo(null);
+    try { await saveProjectLogo(projectId, null); } catch { /* ignore */ }
   }
 
   async function handleDocumentFile(fileName: string) {
@@ -251,6 +286,47 @@ export default function ProjectDetail({
             Criado em{" "}
             {new Date(project.createdAt).toLocaleDateString("pt-BR")}
           </p>
+          {/* Logo do projeto */}
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoFileChange}
+            />
+            {projectLogo ? (
+              <>
+                <img src={projectLogo} alt="Logo do projeto" className="h-8 max-w-[120px] object-contain rounded border border-gray-200 bg-white px-1" />
+                <button
+                  onClick={() => logoInputRef.current?.click()}
+                  className="text-xs text-blue-500 hover:underline"
+                  title="Trocar logo"
+                >
+                  Trocar
+                </button>
+                <button
+                  onClick={handleRemoveLogo}
+                  className="text-xs text-red-400 hover:underline"
+                  title="Remover logo"
+                >
+                  Remover
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition"
+                title="Adicionar logo do projeto"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Adicionar logo do projeto
+              </button>
+            )}
+          </div>
+
           {/* Descrição/contexto do projeto */}
           <div className="mt-2">
             {editingDescription ? (

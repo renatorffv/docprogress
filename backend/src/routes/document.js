@@ -250,7 +250,11 @@ router.get("/:projectId/export/all", async (req, res) => {
   const format = req.query.format === "pdf" ? "pdf" : "docx";
 
   try {
-    const settings = getSettings();
+    const baseSettings = getSettings();
+    const projectMeta = getProject(req.params.projectId);
+    const settings = projectMeta?.logoBase64
+      ? { ...baseSettings, logoBase64: projectMeta.logoBase64 }
+      : baseSettings;
     const JSZip = require("jszip");
     const zip = new JSZip();
     const now = new Date();
@@ -288,7 +292,11 @@ router.get("/:projectId/export/docx", async (req, res) => {
   if (!found) return res.status(404).json({ error: "Documento não encontrado" });
 
   try {
-    const settings = getSettings();
+    const baseSettings = getSettings();
+    const projectMeta = getProject(req.params.projectId);
+    const settings = projectMeta?.logoBase64
+      ? { ...baseSettings, logoBase64: projectMeta.logoBase64 }
+      : baseSettings;
     const title = doc.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
     const buffer = await markdownToDocx(found.content, title, settings);
     const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
