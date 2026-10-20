@@ -6,13 +6,13 @@ const fs = require("fs");
 function findBrowserPath() {
   const candidates = [
     process.env.CHROME_PATH,
-    // Linux (VPS / servidor)
+    // Linux (VPS / servidor) — apt antes do snap (snap não funciona headless)
+    "/usr/bin/chromium",
     "/usr/bin/google-chrome",
     "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/snap/bin/chromium",
     "/usr/local/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
     // Windows
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
