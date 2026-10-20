@@ -20,6 +20,7 @@ export default async function PrintPage({ params, searchParams }: Props) {
 
   let docContent: string | null = null;
   let settings = { companyName: "", logoBase64: null as string | null };
+  let projectName: string | null = null;
 
   try {
     const [{ docs }, fetchedSettings, project] = await Promise.all([
@@ -32,8 +33,9 @@ export default async function PrintPage({ params, searchParams }: Props) {
     );
     if (found) docContent = found.content;
     settings = fetchedSettings;
-    // Logo do projeto tem prioridade sobre o logo global
-    if (project?.logoBase64) settings = { ...settings, logoBase64: project.logoBase64 };
+    const p = project as { name?: string | null; logoBase64?: string | null };
+    if (p?.logoBase64) settings = { ...settings, logoBase64: p.logoBase64 };
+    projectName = p?.name || null;
   } catch {
     return (
       <div className="p-8 text-red-600 text-sm">
@@ -49,8 +51,6 @@ export default async function PrintPage({ params, searchParams }: Props) {
       </div>
     );
   }
-
-  const projectName = (project as { name?: string | null })?.name || null;
 
   return (
     <PrintContent
