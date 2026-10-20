@@ -1,4 +1,4 @@
-import { fetchDocumentation, fetchSettings } from "@/lib/api";
+import { fetchDocumentation, fetchSettings, fetchProject } from "@/lib/api";
 import PrintContent from "./PrintContent";
 
 interface Props {
@@ -22,15 +22,18 @@ export default async function PrintPage({ params, searchParams }: Props) {
   let settings = { companyName: "", logoBase64: null as string | null };
 
   try {
-    const [{ docs }, fetchedSettings] = await Promise.all([
+    const [{ docs }, fetchedSettings, project] = await Promise.all([
       fetchDocumentation(projectId),
       fetchSettings(),
+      fetchProject(projectId),
     ]);
     const found = (docs as { fileName: string; content: string }[]).find(
       (d) => d.fileName === doc
     );
     if (found) docContent = found.content;
     settings = fetchedSettings;
+    // Logo do projeto tem prioridade sobre o logo global
+    if (project?.logoBase64) settings = { ...settings, logoBase64: project.logoBase64 };
   } catch {
     return (
       <div className="p-8 text-red-600 text-sm">
