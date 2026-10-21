@@ -183,6 +183,34 @@ function splitIntoChunks(files) {
   return chunks;
 }
 
+// Se a resposta foi cortada por max_tokens, faz até 2 chamadas de continuação
+async function continueIfTruncated(message, userPrompt, systemBlock, report) {
+  let text = message.content[0].text;
+  let lastMessage = message;
+  let attempts = 0;
+  while (lastMessage.stop_reason === "max_tokens" && attempts < 2) {
+    attempts++;
+    report?.({ message: `Documentação extensa — gerando continuação (parte ${attempts + 1})...` });
+    await sleep(4000);
+    const cont = await callWithRetry(
+      () => client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 8192,
+        system: systemBlock,
+        messages: [
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: text },
+          { role: "user", content: "Continue a documentação exatamente de onde parou, sem repetir nenhum conteúdo já escrito." },
+        ],
+      }),
+      report
+    );
+    text += cont.content[0].text;
+    lastMessage = cont;
+  }
+  return text;
+}
+
 async function documentProject(files, projectDescription, onProgress) {
   const report = (data) => onProgress?.(data);
   const descContext = projectDescription
@@ -202,20 +230,20 @@ async function documentProject(files, projectDescription, onProgress) {
       .join("\n\n");
 
     report({ percent: 10, message: `Documentando ${chunks[0].files.length} arquivo(s)...` });
+    const singlePrompt = `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.${descContext}\n\n${filesContent}`;
     const message = await callWithRetry(
       () => client.messages.create({
         model: "claude-haiku-4-5",
         max_tokens: 8192,
         system: systemBlock,
-        messages: [{
-          role: "user",
-          content: `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.${descContext}\n\n${filesContent}`,
-        }],
+        messages: [{ role: "user", content: singlePrompt }],
       }),
       report
     );
+    report({ percent: 95, message: "Verificando documentação..." });
+    const singleText = await continueIfTruncated(message, singlePrompt, systemBlock, report);
     report({ percent: 98, message: "Salvando documentação..." });
-    return message.content[0].text;
+    return singleText;
   }
 
   // Projeto grande: documenta cada lote com delay entre chamadas
@@ -283,21 +311,21 @@ async function documentProject(files, projectDescription, onProgress) {
     .join("\n\n---\n\n");
 
   console.log("Gerando síntese final do projeto...");
+  const synthesisPrompt = `Com base nas documentações parciais abaixo (${chunks.length} lotes, ${files.length} arquivos no total), crie uma documentação consolidada do projeto Progress 4GL. Descreva a arquitetura geral, as interdependências entre os módulos e um resumo executivo do sistema.${descContext}\n\n${combined}`;
   const synthesis = await callWithRetry(
     () => client.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 8192,
       system: systemBlock,
-      messages: [{
-        role: "user",
-        content: `Com base nas documentações parciais abaixo (${chunks.length} lotes, ${files.length} arquivos no total), crie uma documentação consolidada do projeto Progress 4GL. Descreva a arquitetura geral, as interdependências entre os módulos e um resumo executivo do sistema.${descContext}\n\n${combined}`,
-      }],
+      messages: [{ role: "user", content: synthesisPrompt }],
     }),
     report
   );
 
+  report({ percent: 96, message: "Verificando documentação..." });
+  const synthesisText = await continueIfTruncated(synthesis, synthesisPrompt, systemBlock, report);
   report({ percent: 98, message: "Salvando documentação..." });
-  return synthesis.content[0].text;
+  return synthesisText;
 }
 
 /**
@@ -443,9 +471,11 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
       report, 20, 85
     );
 
-    report({ percent: 95, message: "Salvando documentação..." });
-    const markdown = message.content[0].text;
+    report({ percent: 88, message: "Verificando documentação..." });
+    const groupPrompt = `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${changeSection}\n\n${filesContent}`;
+    const markdown = await continueIfTruncated(message, groupPrompt, systemBlock, report);
 
+    report({ percent: 95, message: "Salvando documentação..." });
     if (!markdown.includes("Sugestões de Melhoria")) {
       report({ percent: 96, message: "Gerando sugestões de melhoria (análise complementar)..." });
       await sleep(5_000);
