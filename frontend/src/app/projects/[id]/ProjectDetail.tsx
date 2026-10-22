@@ -55,6 +55,7 @@ export default function ProjectDetail({
   const [savingDescription, setSavingDescription] = useState(false);
   const [projectLogo, setProjectLogo] = useState<string | null>(project.logoBase64 || null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [downloadingAll, setDownloadingAll] = useState<"pdf" | "docx" | null>(null);
 
   async function handleDownload(path: string, filename: string) {
     try {
@@ -75,6 +76,19 @@ export default function ProjectDetail({
       URL.revokeObjectURL(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao baixar arquivo");
+    }
+  }
+
+  async function handleDownloadAll(format: "pdf" | "docx") {
+    setShowDownloadMenu(false);
+    setDownloadingAll(format);
+    try {
+      await handleDownload(
+        `/api/document/${projectId}/export/all?format=${format}`,
+        `documentacoes_${format}.zip`
+      );
+    } finally {
+      setDownloadingAll(null);
     }
   }
 
@@ -490,21 +504,31 @@ export default function ProjectDetail({
           {tab === "docs" && docs.length > 0 && (
             <div ref={downloadMenuRef} className="relative mb-3">
               <button
-                onClick={() => setShowDownloadMenu((v) => !v)}
-                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                onClick={() => !downloadingAll && setShowDownloadMenu((v) => !v)}
+                disabled={!!downloadingAll}
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                </svg>
-                Baixar Todos ({docs.length})
-                <svg className={`w-3 h-3 transition-transform ${showDownloadMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                {downloadingAll ? (
+                  <svg className="w-4 h-4 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                )}
+                {downloadingAll ? `Gerando ${downloadingAll.toUpperCase()}s…` : `Baixar Todos (${docs.length})`}
+                {!downloadingAll && (
+                  <svg className={`w-3 h-3 transition-transform ${showDownloadMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
               </button>
               {showDownloadMenu && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
                   <button
-                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=docx`, `documentacoes_word.zip`); }}
+                    onClick={() => handleDownloadAll("docx")}
                     className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition w-full text-left"
                   >
                     <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -513,7 +537,7 @@ export default function ProjectDetail({
                     Word (.docx)
                   </button>
                   <button
-                    onClick={() => { setShowDownloadMenu(false); handleDownload(`/api/document/${projectId}/export/all?format=pdf`, `documentacoes_pdf.zip`); }}
+                    onClick={() => handleDownloadAll("pdf")}
                     className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-100 w-full text-left"
                   >
                     <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -695,6 +719,37 @@ export default function ProjectDetail({
             });
           }}
         />
+      )}
+
+      {/* Overlay de progresso — exportar todos */}
+      {downloadingAll && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-10 pointer-events-none">
+          <div className="pointer-events-auto bg-gray-900 text-white rounded-xl shadow-2xl px-6 py-4 flex flex-col gap-3 min-w-[320px] max-w-sm">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 shrink-0 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+              </svg>
+              <div>
+                <p className="text-sm font-semibold leading-tight">
+                  Gerando {downloadingAll === "pdf" ? "PDFs" : "documentos Word"}…
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Aguarde, isso pode levar alguns segundos para projetos grandes.
+                </p>
+              </div>
+            </div>
+            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full"
+                style={{
+                  width: "40%",
+                  animation: "slide-progress 1.4s ease-in-out infinite",
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

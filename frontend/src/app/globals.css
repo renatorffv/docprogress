@@ -14,6 +14,12 @@
   }
 }
 
+@keyframes slide-progress {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(150%); }
+  100% { transform: translateX(150%); }
+}
+
 /* ── Dark mode ────────────────────────────────────────────────────────────────
    CSS outside @layer always wins over Tailwind utilities inside @layer, so
    these overrides work on every component without touching each one.
