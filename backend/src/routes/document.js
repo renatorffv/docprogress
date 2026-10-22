@@ -6,7 +6,7 @@ const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAn
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
 const { markdownToDocx } = require("../services/docxExport");
-const { markdownToPdf } = require("../services/pdfExport");
+const { markdownToPdf, markdownToPdfBatch } = require("../services/pdfExport");
 
 const router = express.Router();
 
@@ -260,13 +260,20 @@ router.get("/:projectId/export/all", async (req, res) => {
     const now = new Date();
     const dateSuffix = `${String(now.getDate()).padStart(2,"0")}${String(now.getMonth()+1).padStart(2,"0")}${now.getFullYear()}`;
 
-    for (const doc of docs) {
-      const title = doc.fileName.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
-      const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
-      if (format === "pdf") {
-        const buffer = await markdownToPdf(doc.content, title, settings);
+    if (format === "pdf") {
+      const items = docs.map((doc) => ({
+        content: doc.content,
+        title: doc.fileName.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, ""),
+      }));
+      const pdfs = await markdownToPdfBatch(items, settings);
+      for (const { title, buffer } of pdfs) {
+        const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
         zip.file(`${safeName}-${dateSuffix}.pdf`, buffer);
-      } else {
+      }
+    } else {
+      for (const doc of docs) {
+        const title = doc.fileName.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
+        const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
         const buffer = await markdownToDocx(doc.content, title, settings);
         zip.file(`${safeName}-${dateSuffix}.docx`, buffer);
       }

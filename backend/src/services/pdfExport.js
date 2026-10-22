@@ -168,6 +168,15 @@ function escHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+const LAUNCH_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-gpu",
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  "--single-process",
+];
+
 // ── Public API ───────────────────────────────────────────────────────────────
 async function markdownToPdf(content, title, settings) {
   const executablePath = findBrowserPath();
@@ -178,19 +187,7 @@ async function markdownToPdf(content, title, settings) {
   }
 
   const html = buildHtml(content, title, settings);
-
-  const browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-      "--disable-extensions",
-      "--single-process",
-    ],
-  });
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
 
   try {
     const page = await browser.newPage();
@@ -206,4 +203,39 @@ async function markdownToPdf(content, title, settings) {
   }
 }
 
-module.exports = { markdownToPdf };
+// Gera múltiplos PDFs reusando um único browser — muito mais rápido para lotes
+async function markdownToPdfBatch(items, settings) {
+  const executablePath = findBrowserPath();
+  if (!executablePath) {
+    throw new Error(
+      "Chrome ou Edge não encontrado. Instale o Google Chrome ou defina a variável CHROME_PATH."
+    );
+  }
+
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: LAUNCH_ARGS });
+  const results = [];
+
+  try {
+    for (const { content, title } of items) {
+      const html = buildHtml(content, title, settings);
+      const page = await browser.newPage();
+      try {
+        await page.setContent(html, { waitUntil: "networkidle0" });
+        const pdf = await page.pdf({
+          format: "A4",
+          printBackground: true,
+          margin: { top: "20mm", bottom: "20mm", left: "0mm", right: "0mm" },
+        });
+        results.push({ title, buffer: Buffer.from(pdf) });
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+
+  return results;
+}
+
+module.exports = { markdownToPdf, markdownToPdfBatch };
