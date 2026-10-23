@@ -62,10 +62,6 @@ function buildHtml(markdownContent, title, settings) {
     }
   }
 
-  const date = new Date().toLocaleDateString("pt-BR", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-  });
-
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -145,26 +141,12 @@ function buildHtml(markdownContent, title, settings) {
   }
   tr:nth-child(even) td { background: #f9fafb; }
 
-  /* ── Footer ── */
-  .doc-footer {
-    margin-top: 48px;
-    padding-top: 14px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #9ca3af;
-  }
 </style>
 </head>
 <body>
   ${headerHtml}
   <div class="prose">
     ${bodyHtml}
-  </div>
-  <div class="doc-footer">
-    <span>Elaborado por DKP Consultoria e Tecnologia &mdash; dkp-it.com.br</span>
-    <span>Gerado em ${date}</span>
   </div>
 </body>
 </html>`;
@@ -176,6 +158,29 @@ function escHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// Opções de PDF com rodapé nativo em todas as páginas (inclui contador de páginas)
+function buildPdfOptions() {
+  const date = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  });
+  const footerTemplate = `
+    <div style="width:100%;font-size:10px;color:#9ca3af;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+      display:flex;justify-content:space-between;align-items:center;
+      padding:0 60px;box-sizing:border-box;">
+      <span>Elaborado por DKP Consultoria e Tecnologia &mdash; dkp-it.com.br</span>
+      <span>Gerado em ${date}&nbsp;&nbsp;<span class="pageNumber"></span>/<span class="totalPages"></span></span>
+    </div>`;
+  return {
+    format: "A4",
+    printBackground: true,
+    displayHeaderFooter: true,
+    headerTemplate: "<span></span>",
+    footerTemplate,
+    margin: { top: "20mm", bottom: "12mm", left: "0mm", right: "0mm" },
+  };
 }
 
 const LAUNCH_ARGS = [
@@ -202,11 +207,7 @@ async function markdownToPdf(content, title, settings) {
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "20mm", bottom: "20mm", left: "0mm", right: "0mm" },
-    });
+    const pdf = await page.pdf(buildPdfOptions());
     return Buffer.from(pdf);
   } finally {
     await browser.close();
@@ -231,11 +232,7 @@ async function markdownToPdfBatch(items, settings) {
       const page = await browser.newPage();
       try {
         await page.setContent(html, { waitUntil: "networkidle0" });
-        const pdf = await page.pdf({
-          format: "A4",
-          printBackground: true,
-          margin: { top: "20mm", bottom: "20mm", left: "0mm", right: "0mm" },
-        });
+        const pdf = await page.pdf(buildPdfOptions());
         results.push({ title, buffer: Buffer.from(pdf) });
       } finally {
         await page.close();
