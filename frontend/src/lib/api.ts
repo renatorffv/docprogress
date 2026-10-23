@@ -226,6 +226,16 @@ export async function saveProjectLogo(projectId: string, logoBase64: string | nu
   return res.json();
 }
 
+export async function saveProjectShowConfigLogo(projectId: string, showConfigLogo: boolean) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/show-config-logo`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ showConfigLogo }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar configuração de logo");
+  return res.json();
+}
+
 export async function saveProjectDescription(projectId: string, description: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/description`, {
     method: "PATCH",

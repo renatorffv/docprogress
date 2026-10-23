@@ -239,6 +239,15 @@ function saveProjectDescription(projectId, description) {
   return manifest;
 }
 
+function saveProjectShowConfigLogo(projectId, showConfigLogo) {
+  const manifestPath = path.join(UPLOADS_DIR, projectId, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  manifest.showConfigLogo = !!showConfigLogo;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
 function updateGroupDescription(projectId, groupId, description) {
   const analysisPath = path.join(DOCS_DIR, projectId, "_analysis.json");
   if (!fs.existsSync(analysisPath)) return null;
@@ -276,6 +285,7 @@ module.exports = {
   renameProject,
   saveProjectLogo,
   saveProjectDescription,
+  saveProjectShowConfigLogo,
   updateGroupDescription,
   saveAnalysis,
   getAnalysis,

@@ -35,22 +35,32 @@ function findBrowserPath() {
 function buildHtml(markdownContent, title, settings) {
   const bodyHtml = marked.parse(markdownContent, { gfm: true, breaks: false });
 
-  const logoHtml =
-    settings?.logoBase64
-      ? `<img src="${settings.logoBase64}" alt="Logo" style="max-height:64px;max-width:200px;object-fit:contain;">`
-      : "";
+  const { logoBase64, configLogoBase64, companyName, projectName } = settings || {};
+  const displayName = projectName || companyName || "";
 
-  const companyHtml =
-    settings?.companyName
-      ? `<span style="font-size:20px;font-weight:700;color:#1f2937;">${escHtml(settings.companyName)}</span>`
-      : "";
+  const leftLogoHtml = logoBase64
+    ? `<img src="${logoBase64}" alt="Logo" style="max-height:64px;max-width:200px;object-fit:contain;">`
+    : "";
+  const displayNameHtml = displayName
+    ? `<span style="font-size:20px;font-weight:700;color:#1f2937;">${escHtml(displayName)}</span>`
+    : "";
+  const rightLogoHtml = configLogoBase64
+    ? `<img src="${configLogoBase64}" alt="Logo Config" style="max-height:56px;max-width:180px;object-fit:contain;">`
+    : "";
 
-  const headerHtml =
-    logoHtml || companyHtml
-      ? `<div style="display:flex;align-items:center;gap:20px;padding-bottom:24px;margin-bottom:32px;border-bottom:2px solid #1f2937;">
-           ${logoHtml}${companyHtml}
-         </div>`
-      : "";
+  let headerHtml = "";
+  if (leftLogoHtml || displayNameHtml) {
+    if (rightLogoHtml) {
+      headerHtml = `<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:24px;margin-bottom:32px;border-bottom:2px solid #1f2937;">
+        <div style="display:flex;align-items:center;gap:16px;">${leftLogoHtml}${displayNameHtml}</div>
+        <div>${rightLogoHtml}</div>
+      </div>`;
+    } else {
+      headerHtml = `<div style="display:flex;align-items:center;gap:20px;padding-bottom:24px;margin-bottom:32px;border-bottom:2px solid #1f2937;">
+        ${leftLogoHtml}${displayNameHtml}
+      </div>`;
+    }
+  }
 
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit", month: "2-digit", year: "numeric",

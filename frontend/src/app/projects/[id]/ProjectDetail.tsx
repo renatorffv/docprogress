@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { generateDocFile, startDocProject, pollDocProject, renameProject, saveProjectDescription, saveProjectLogo } from "@/lib/api";
+import { generateDocFile, startDocProject, pollDocProject, renameProject, saveProjectDescription, saveProjectLogo, saveProjectShowConfigLogo } from "@/lib/api";
 import { authHeader } from "@/lib/auth";
 import ProgramsTab from "./ProgramsTab";
 import UpdateSourcesModal from "./UpdateSourcesModal";
@@ -15,6 +15,7 @@ interface ProjectDetailProps {
     name?: string | null;
     description?: string | null;
     logoBase64?: string | null;
+    showConfigLogo?: boolean;
     createdAt: string;
     files: { name: string; size: number; needsRedoc?: boolean; uploadedAt?: string; changedAt?: string | null; fileModifiedAt?: string | null }[];
   };
@@ -54,6 +55,7 @@ export default function ProjectDetail({
   const [editingDescription, setEditingDescription] = useState(false);
   const [savingDescription, setSavingDescription] = useState(false);
   const [projectLogo, setProjectLogo] = useState<string | null>(project.logoBase64 || null);
+  const [showConfigLogo, setShowConfigLogo] = useState<boolean>(project.showConfigLogo ?? false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [downloadingAll, setDownloadingAll] = useState<"pdf" | "docx" | null>(null);
 
@@ -340,6 +342,23 @@ export default function ProjectDetail({
               </button>
             )}
           </div>
+
+          {/* Toggle: exibir logo das configurações no lado direito */}
+          {projectLogo && (
+            <label className="mt-1.5 flex items-center gap-2 cursor-pointer select-none">
+              <div
+                onClick={async () => {
+                  const next = !showConfigLogo;
+                  setShowConfigLogo(next);
+                  try { await saveProjectShowConfigLogo(projectId, next); } catch { /* ignore */ }
+                }}
+                className={`relative w-8 h-4 rounded-full transition-colors ${showConfigLogo ? "bg-blue-500" : "bg-gray-300"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${showConfigLogo ? "translate-x-4" : ""}`} />
+              </div>
+              <span className="text-xs text-gray-500">Exibir logo das configurações no documento</span>
+            </label>
+          )}
 
           {/* Descrição/contexto do projeto */}
           <div className="mt-2">

@@ -19,7 +19,7 @@ export default async function PrintPage({ params, searchParams }: Props) {
   }
 
   let docContent: string | null = null;
-  let settings = { companyName: "", logoBase64: null as string | null };
+  let settings = { companyName: "", logoBase64: null as string | null, configLogoBase64: null as string | null };
   let projectName: string | null = null;
 
   try {
@@ -32,9 +32,16 @@ export default async function PrintPage({ params, searchParams }: Props) {
       (d) => d.fileName === doc
     );
     if (found) docContent = found.content;
-    settings = fetchedSettings;
-    const p = project as { name?: string | null; logoBase64?: string | null };
-    if (p?.logoBase64) settings = { ...settings, logoBase64: p.logoBase64 };
+    const configLogo = (fetchedSettings as { logoBase64?: string | null }).logoBase64 || null;
+    settings = { ...fetchedSettings, logoBase64: configLogo, configLogoBase64: null };
+    const p = project as { name?: string | null; logoBase64?: string | null; showConfigLogo?: boolean };
+    if (p?.logoBase64) {
+      settings = {
+        ...settings,
+        logoBase64: p.logoBase64,
+        configLogoBase64: (p.showConfigLogo && configLogo) ? configLogo : null,
+      };
+    }
     projectName = p?.name || null;
   } catch {
     return (

@@ -200,42 +200,77 @@ function blocksToParagraphs(tokens) {
 }
 
 async function markdownToDocx(content, title, settings = {}) {
-  const { companyName, logoBase64 } = settings;
+  const { companyName, logoBase64, configLogoBase64, projectName } = settings;
+  const displayName = projectName || companyName || "";
 
-  // Cabeçalho: logo + nome da empresa
+  // Cabeçalho: logo esquerdo + nome | logo direito (opcional)
   const headerChildren = [];
+  const hasLeft = !!(logoBase64 || displayName);
+  const hasRight = !!configLogoBase64;
 
-  if (logoBase64) {
-    try {
-      const base64Data = logoBase64.includes(",") ? logoBase64.split(",")[1] : logoBase64;
+  if (hasLeft || hasRight) {
+    if (hasRight) {
+      // Tabela com 2 colunas: esquerda (logo + nome), direita (config logo)
+      const leftCells = [];
+      if (logoBase64) {
+        try {
+          const b64 = logoBase64.includes(",") ? logoBase64.split(",")[1] : logoBase64;
+          leftCells.push(new Paragraph({
+            children: [new ImageRun({ data: Buffer.from(b64, "base64"), transformation: { width: 120, height: 40 } })],
+            spacing: { after: 40 },
+          }));
+        } catch { /* ignora */ }
+      }
+      if (displayName) {
+        leftCells.push(new Paragraph({
+          children: [new TextRun({ text: displayName, bold: true, size: 26, color: "222222" })],
+        }));
+      }
+
+      const rightCells = [];
+      try {
+        const b64r = configLogoBase64.includes(",") ? configLogoBase64.split(",")[1] : configLogoBase64;
+        rightCells.push(new Paragraph({
+          children: [new ImageRun({ data: Buffer.from(b64r, "base64"), transformation: { width: 120, height: 40 } })],
+          alignment: AlignmentType.RIGHT,
+        }));
+      } catch { /* ignora */ }
+
       headerChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: Buffer.from(base64Data, "base64"),
-              transformation: { width: 120, height: 40 },
-              floating: undefined,
-            }),
-          ],
-          spacing: { after: 60 },
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: {
+            top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+            left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+            insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE },
+          },
+          rows: [new TableRow({
+            children: [
+              new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, children: leftCells.length ? leftCells : [new Paragraph({ children: [] })] }),
+              new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, children: rightCells.length ? rightCells : [new Paragraph({ children: [] })] }),
+            ],
+          })],
         })
       );
-    } catch {
-      // ignora erros de imagem
+    } else {
+      // Logo simples (original)
+      if (logoBase64) {
+        try {
+          const b64 = logoBase64.includes(",") ? logoBase64.split(",")[1] : logoBase64;
+          headerChildren.push(new Paragraph({
+            children: [new ImageRun({ data: Buffer.from(b64, "base64"), transformation: { width: 120, height: 40 } })],
+            spacing: { after: 60 },
+          }));
+        } catch { /* ignora */ }
+      }
+      if (displayName) {
+        headerChildren.push(new Paragraph({
+          children: [new TextRun({ text: displayName, bold: true, size: 26, color: "222222" })],
+          spacing: { after: 80 },
+        }));
+      }
     }
-  }
 
-  if (companyName) {
-    headerChildren.push(
-      new Paragraph({
-        children: [new TextRun({ text: companyName, bold: true, size: 26, color: "222222" })],
-        spacing: { after: 80 },
-      })
-    );
-  }
-
-  // Separador após cabeçalho
-  if (headerChildren.length > 0) {
     headerChildren.push(
       new Paragraph({
         children: [],

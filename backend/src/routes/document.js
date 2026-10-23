@@ -10,6 +10,22 @@ const { markdownToPdf, markdownToPdfBatch } = require("../services/pdfExport");
 
 const router = express.Router();
 
+// Monta o objeto de settings para exportação, respeitando a lógica de logos por projeto
+function buildExportSettings(baseSettings, projectMeta) {
+  const projectLogo = projectMeta?.logoBase64 || null;
+  const configLogo = baseSettings.logoBase64 || null;
+  // logo esquerdo: projeto se existir, senão config
+  const logoBase64 = projectLogo || configLogo;
+  // logo direito: config, mas somente quando projeto tem logo E showConfigLogo ativo
+  const configLogoBase64 = (projectLogo && projectMeta?.showConfigLogo) ? configLogo : null;
+  return {
+    ...baseSettings,
+    logoBase64,
+    configLogoBase64,
+    projectName: projectMeta?.name || null,
+  };
+}
+
 // Jobs persistidos em disco — sobrevivem a reinicializações do servidor (node --watch, crashes, etc.)
 const JOBS_DIR = path.join(__dirname, "..", "docs", "jobs");
 
@@ -252,9 +268,7 @@ router.get("/:projectId/export/all", async (req, res) => {
   try {
     const baseSettings = getSettings();
     const projectMeta = getProject(req.params.projectId);
-    const settings = projectMeta?.logoBase64
-      ? { ...baseSettings, logoBase64: projectMeta.logoBase64 }
-      : baseSettings;
+    const settings = buildExportSettings(baseSettings, projectMeta);
     const JSZip = require("jszip");
     const zip = new JSZip();
     const now = new Date();
@@ -301,9 +315,7 @@ router.get("/:projectId/export/docx", async (req, res) => {
   try {
     const baseSettings = getSettings();
     const projectMeta = getProject(req.params.projectId);
-    const settings = projectMeta?.logoBase64
-      ? { ...baseSettings, logoBase64: projectMeta.logoBase64 }
-      : baseSettings;
+    const settings = buildExportSettings(baseSettings, projectMeta);
     const title = doc.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
     const buffer = await markdownToDocx(found.content, title, settings);
     const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");

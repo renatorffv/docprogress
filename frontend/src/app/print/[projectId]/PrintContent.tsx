@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 interface Props {
   docName: string;
   content: string;
-  settings: { companyName: string; logoBase64: string | null };
+  settings: { companyName: string; logoBase64: string | null; configLogoBase64?: string | null };
   projectName?: string | null;
 }
 
@@ -63,27 +63,37 @@ function DocumentBody({
   content,
 }: {
   hasHeader: boolean;
-  settings: { companyName: string; logoBase64: string | null };
+  settings: { companyName: string; logoBase64: string | null; configLogoBase64?: string | null };
   displayName: string;
   title: string;
   content: string;
 }) {
+  const hasRightLogo = !!settings.configLogoBase64;
   return (
     <div>
       {/* Cabeçalho com logo e nome do projeto (ou empresa) */}
       {hasHeader && (
-        <div className="flex items-center gap-5 pb-6 mb-8 border-b-2 border-gray-800">
-          {settings.logoBase64 && (
+        <div className={`flex items-center pb-6 mb-8 border-b-2 border-gray-800 ${hasRightLogo ? "justify-between" : "gap-5"}`}>
+          <div className="flex items-center gap-4">
+            {settings.logoBase64 && (
+              <img
+                src={settings.logoBase64}
+                alt="Logo"
+                className="max-h-16 max-w-[200px] object-contain"
+              />
+            )}
+            {displayName && (
+              <span className="text-xl font-bold text-gray-800">
+                {displayName}
+              </span>
+            )}
+          </div>
+          {hasRightLogo && (
             <img
-              src={settings.logoBase64}
+              src={settings.configLogoBase64!}
               alt="Logo"
-              className="max-h-16 max-w-[200px] object-contain"
+              className="max-h-14 max-w-[180px] object-contain"
             />
-          )}
-          {displayName && (
-            <span className="text-xl font-bold text-gray-800">
-              {displayName}
-            </span>
           )}
         </div>
       )}
