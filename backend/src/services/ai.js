@@ -135,8 +135,10 @@ ${codePreview}
   return "\n\n---\n\n" + text;
 }
 
-async function documentCode(code, fileName) {
+async function documentCode(code, fileName, options = {}) {
+  const include = options.includeSuggestions !== false;
   const systemPrompt = buildSystemPrompt();
+  const noSug = noSuggestionsInstruction(include ? undefined : false);
 
   const message = await callWithRetry(
     () => client.messages.create({
@@ -145,7 +147,7 @@ async function documentCode(code, fileName) {
       system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages: [{
         role: "user",
-        content: `Documente o seguinte programa Progress 4GL seguindo TODAS as seções definidas no system prompt.\n\nIMPORTANTE: Inclua obrigatoriamente:\n- "Visão Geral": explicação em linguagem de negócio, sem jargão técnico\n- "Sugestões de Melhoria": com as 4 categorias (Hard Code, Performance, Manutenibilidade, Boas Práticas)\n\nArquivo: ${fileName}\n\n\`\`\`progress\n${code}\n\`\`\``,
+        content: `Documente o seguinte programa Progress 4GL seguindo TODAS as seções definidas no system prompt.\n\nIMPORTANTE: Inclua obrigatoriamente:\n- "Visão Geral": explicação em linguagem de negócio, sem jargão técnico${include ? '\n- "Sugestões de Melhoria": com as 4 categorias (Hard Code, Performance, Manutenibilidade, Boas Práticas)' : ''}${noSug}\n\nArquivo: ${fileName}\n\n\`\`\`progress\n${code}\n\`\`\``,
       }],
     }),
     null
@@ -154,7 +156,7 @@ async function documentCode(code, fileName) {
   const markdown = message.content[0].text;
 
   // Se o limite de tokens cortou o doc antes de chegar em "Sugestões de Melhoria", gera em chamada separada
-  if (!markdown.includes("Sugestões de Melhoria")) {
+  if (include && !markdown.includes("Sugestões de Melhoria")) {
     await sleep(5_000); // pequena pausa para não estourar rate limit
     const suggestions = await generateSuggestions([{ name: fileName, content: code }], fileName, null);
     return markdown + suggestions;
@@ -211,7 +213,9 @@ async function continueIfTruncated(message, userPrompt, systemBlock, report) {
   return text;
 }
 
-async function documentProject(files, projectDescription, onProgress) {
+async function documentProject(files, projectDescription, onProgress, options = {}) {
+  const include = options.includeSuggestions !== false;
+  const noSug = noSuggestionsInstruction(include ? undefined : false);
   const report = (data) => onProgress?.(data);
   const descContext = projectDescription
     ? `\n\nCONTEXTO DO PROJETO (informado pelo usuário — use para enriquecer a documentação):\n${projectDescription}\n`
@@ -230,7 +234,7 @@ async function documentProject(files, projectDescription, onProgress) {
       .join("\n\n");
 
     report({ percent: 10, message: `Documentando ${chunks[0].files.length} arquivo(s)...` });
-    const singlePrompt = `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio) e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas) para cada programa.${descContext}\n\n${filesContent}`;
+    const singlePrompt = `Documente o seguinte projeto Progress 4GL. Analise todos os arquivos e suas interdependências.\n\nIMPORTANTE: Inclua obrigatoriamente "Visão Geral" (linguagem de negócio)${include ? ' e "Sugestões de Melhoria" (Hard Code, Performance, Manutenibilidade, Boas Práticas)' : ''} para cada programa.${descContext}${noSug}\n\n${filesContent}`;
     const message = await callWithRetry(
       () => client.messages.create({
         model: "claude-haiku-4-5",
@@ -412,6 +416,14 @@ Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
   }
 }
 
+// Instrução adicionada ao user prompt quando sugestões estão desabilitadas
+function noSuggestionsInstruction(include) {
+  if (include === false) {
+    return "\n\nIMPORTANTE: NÃO inclua a seção 'Sugestões de Melhoria'. Omita completamente qualquer análise de hard code, performance, manutenibilidade e boas práticas.";
+  }
+  return "";
+}
+
 function buildChangedFilesSection(changedFiles) {
   if (!changedFiles || changedFiles.length === 0) return "";
   let s = "\n\nATENCAO ARQUIVOS MODIFICADOS RECENTEMENTE:\n";
@@ -428,7 +440,9 @@ function buildChangedFilesSection(changedFiles) {
 /**
  * Documenta um conjunto de arquivos como um unico programa Datasul.
  */
-async function documentGroup(groupFiles, groupName, groupType, groupDescription, onProgress, changedFiles = []) {
+async function documentGroup(groupFiles, groupName, groupType, groupDescription, onProgress, changedFiles = [], options = {}) {
+  const include = options.includeSuggestions !== false;
+  const noSug = noSuggestionsInstruction(include ? undefined : false);
   const report = (data) => onProgress?.(data);
   const systemPrompt = buildSystemPrompt();
   const systemBlock = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
@@ -463,7 +477,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
           system: systemBlock,
           messages: [{
             role: "user",
-            content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${changeSection}\n\n${filesContent}`,
+            content: `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)${include ? '\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."' : ''}${noSug}${changeSection}\n\n${filesContent}`,
           }],
         }),
         report
@@ -472,11 +486,11 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
     );
 
     report({ percent: 88, message: "Verificando documentação..." });
-    const groupPrompt = `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."${changeSection}\n\n${filesContent}`;
+    const groupPrompt = `Documente o programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nAnalise todos os arquivos abaixo como uma unidade funcional única e gere documentação seguindo TODAS as seções do system prompt.\n\nIMPORTANTE — inclua obrigatoriamente:\n1. "Visão Geral": explicação em linguagem de negócio, sem jargão técnico, para usuários finais\n2. "Objetivo Técnico": tipo, módulo e responsabilidades\n3. Seções técnicas resumidas (Parâmetros, Tabelas, Procedures, Fluxo, etc.)${include ? '\n4. "Sugestões de Melhoria": analise o código e liste achados nas 4 categorias — (a) Dados Fixos/Hard Code encontrados, (b) Problemas de Performance, (c) Manutenibilidade, (d) Boas Práticas. Se não houver ocorrências em uma categoria, escreva "Nenhuma ocorrência identificada."' : ''}${noSug}${changeSection}\n\n${filesContent}`;
     const markdown = await continueIfTruncated(message, groupPrompt, systemBlock, report);
 
     report({ percent: 95, message: "Salvando documentação..." });
-    if (!markdown.includes("Sugestões de Melhoria")) {
+    if (include && !markdown.includes("Sugestões de Melhoria")) {
       report({ percent: 96, message: "Gerando sugestões de melhoria (análise complementar)..." });
       await sleep(5_000);
       const suggestions = await generateSuggestions(groupFiles, groupName, report);
@@ -510,7 +524,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
           system: systemBlock,
           messages: [{
             role: "user",
-            content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul. Inclua Visão Geral em linguagem de negócio e Sugestões de Melhoria com Hard Code, Performance, Manutenibilidade e Boas Práticas.\n\n${filesContent}`,
+            content: `Documente os arquivos abaixo (lote ${i + 1}/${chunks.length}) do programa "${groupName}" (${typeLabel}) do ERP Datasul. Inclua Visão Geral em linguagem de negócio${include ? ' e Sugestões de Melhoria com Hard Code, Performance, Manutenibilidade e Boas Práticas' : ''}.${noSug}\n\n${filesContent}`,
           }],
         }),
         report
@@ -535,7 +549,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
         system: systemBlock,
         messages: [{
           role: "user",
-          content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nIMPORTANTE: A documentação final deve incluir obrigatoriamente:\n1. "Visão Geral": linguagem de negócio, sem jargão técnico, para o usuário final\n2. Seções técnicas consolidadas e resumidas\n3. "Sugestões de Melhoria" consolidadas com as 4 categorias: Hard Code, Performance, Manutenibilidade, Boas Práticas\n\n${combined}`,
+          content: `Com base nas partes abaixo, crie a documentação completa e consolidada do programa "${groupName}" (${typeLabel}) do ERP Datasul.\n\nDescrição: ${groupDescription}\n\nIMPORTANTE: A documentação final deve incluir obrigatoriamente:\n1. "Visão Geral": linguagem de negócio, sem jargão técnico, para o usuário final\n2. Seções técnicas consolidadas e resumidas${include ? '\n3. "Sugestões de Melhoria" consolidadas com as 4 categorias: Hard Code, Performance, Manutenibilidade, Boas Práticas' : ''}${noSug}\n\n${combined}`,
         }],
       }),
       report
@@ -544,7 +558,7 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
   );
   const finalDoc = synthesis.content[0].text;
 
-  if (!finalDoc.includes("Sugestões de Melhoria")) {
+  if (include && !finalDoc.includes("Sugestões de Melhoria")) {
     report({ percent: 98, message: "Gerando sugestões de melhoria (análise complementar)..." });
     await sleep(5_000);
     const suggestions = await generateSuggestions(groupFiles, groupName, report);

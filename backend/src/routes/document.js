@@ -98,7 +98,9 @@ router.post("/file", async (req, res) => {
       return res.status(404).json({ error: "Arquivo não encontrado no projeto" });
     }
 
-    const markdown = await documentCode(file.content, file.name);
+    const projectMeta = getProject(projectId);
+    const options = { includeSuggestions: projectMeta?.includeSuggestions !== false };
+    const markdown = await documentCode(file.content, file.name, options);
     const doc = saveDocumentation(projectId, file.name, markdown);
 
     res.json({ fileName: doc.fileName, documentation: markdown });
@@ -129,6 +131,7 @@ router.post("/project", (req, res) => {
     try {
       const projectMeta = getProject(projectId);
       const projectDescription = projectMeta?.description || null;
+      const options = { includeSuggestions: projectMeta?.includeSuggestions !== false };
       console.log(`[job:${jobId}] Iniciando documentação de ${files.length} arquivo(s)...`);
       const markdown = await documentProject(files, projectDescription, ({ percent, message }) => {
         const current = getJob(jobId) || {};
@@ -137,7 +140,7 @@ router.post("/project", (req, res) => {
           percent: percent ?? current.percent ?? 0,
           message: message ?? current.message ?? "",
         });
-      });
+      }, options);
       const doc = saveDocumentation(projectId, "_projeto", markdown);
       setJob(jobId, {
         status: "done",
@@ -230,6 +233,7 @@ router.post("/group", (req, res) => {
         })
         .filter(Boolean);
 
+      const options = { includeSuggestions: manifest?.includeSuggestions !== false };
       const markdown = await documentGroup(
         groupFiles,
         groupName || groupId,
@@ -239,7 +243,8 @@ router.post("/group", (req, res) => {
           const cur = getJob(jobId) || {};
           setJob(jobId, { ...cur, percent: percent ?? cur.percent ?? 0, message: message ?? cur.message ?? "" });
         },
-        changedFiles
+        changedFiles,
+        options
       );
       const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
       clearNeedsRedoc(projectId, fileNames);

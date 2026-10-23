@@ -1,5 +1,5 @@
 const express = require("express");
-const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription, saveProjectLogo, saveProjectShowConfigLogo } = require("../services/storage");
+const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription, saveProjectLogo, saveProjectShowConfigLogo, saveProjectIncludeSuggestions } = require("../services/storage");
 
 const router = express.Router();
 
@@ -56,6 +56,13 @@ router.patch("/:id/show-config-logo", (req, res) => {
   const manifest = saveProjectShowConfigLogo(req.params.id, showConfigLogo);
   if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
   res.json({ id: manifest.id, showConfigLogo: manifest.showConfigLogo });
+});
+
+router.patch("/:id/include-suggestions", (req, res) => {
+  const { includeSuggestions } = req.body;
+  const manifest = saveProjectIncludeSuggestions(req.params.id, includeSuggestions);
+  if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
+  res.json({ id: manifest.id, includeSuggestions: manifest.includeSuggestions });
 });
 
 module.exports = router;

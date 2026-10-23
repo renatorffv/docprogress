@@ -236,6 +236,16 @@ export async function saveProjectShowConfigLogo(projectId: string, showConfigLog
   return res.json();
 }
 
+export async function saveProjectIncludeSuggestions(projectId: string, includeSuggestions: boolean) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/include-suggestions`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ includeSuggestions }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar configuração de sugestões");
+  return res.json();
+}
+
 export async function saveProjectDescription(projectId: string, description: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/description`, {
     method: "PATCH",
