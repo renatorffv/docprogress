@@ -696,17 +696,18 @@ export default function ProjectDetail({
                   </svg>
                   Baixar Word
                 </button>
-                <a
-                  href={`/print/${projectId}?doc=${encodeURIComponent(activeDoc.fileName)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition"
+                <button
+                  onClick={() => handleDownload(
+                    `/api/document/${projectId}/export/pdf?doc=${encodeURIComponent(activeDoc.fileName)}`,
+                    `${activeDoc.fileName.replace(/\.[^.]+$/, "")}.pdf`
+                  )}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-700 rounded text-sm hover:bg-red-50 transition"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   Exportar PDF
-                </a>
+                </button>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 p-6 prose prose-sm max-w-none max-h-[70vh] overflow-y-auto">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>

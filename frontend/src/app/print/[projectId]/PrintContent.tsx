@@ -105,7 +105,7 @@ function DocumentBody({
 
       {/* Rodapé */}
       <div className="mt-12 pt-4 border-t border-gray-200 flex justify-between text-xs text-gray-400">
-        <span>{title}</span>
+        <span>Elaborado por DKP Consultoria e Tecnologia &mdash; dkp-it.com.br</span>
         <span>
           Gerado em{" "}
           {new Date().toLocaleDateString("pt-BR", {

@@ -163,7 +163,7 @@ function buildHtml(markdownContent, title, settings) {
     ${bodyHtml}
   </div>
   <div class="doc-footer">
-    <span>${escHtml(title)}</span>
+    <span>Elaborado por DKP Consultoria e Tecnologia &mdash; dkp-it.com.br</span>
     <span>Gerado em ${date}</span>
   </div>
 </body>

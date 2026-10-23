@@ -303,6 +303,33 @@ router.get("/:projectId/export/all", async (req, res) => {
   }
 });
 
+// Download de documentação em formato PDF (individual)
+router.get("/:projectId/export/pdf", async (req, res) => {
+  const { doc } = req.query;
+  if (!doc) return res.status(400).json({ error: "Parâmetro 'doc' obrigatório" });
+
+  const docs = getDocumentation(req.params.projectId);
+  const found = docs.find((d) => d.fileName === doc);
+  if (!found) return res.status(404).json({ error: "Documento não encontrado" });
+
+  try {
+    const baseSettings = getSettings();
+    const projectMeta = getProject(req.params.projectId);
+    const settings = buildExportSettings(baseSettings, projectMeta);
+    const title = doc.replace(/\.md$/, "").replace(/^_grp_/, "").replace(/^_/, "");
+    const buffer = await markdownToPdf(found.content, title, settings);
+    const safeName = title.replace(/[^a-z0-9_\-\s]/gi, "_");
+    const now = new Date();
+    const dateSuffix = `${String(now.getDate()).padStart(2,"0")}${String(now.getMonth()+1).padStart(2,"0")}${now.getFullYear()}`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}-${dateSuffix}.pdf"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error("Erro ao gerar PDF:", err);
+    res.status(500).json({ error: "Falha ao gerar PDF: " + err.message });
+  }
+});
+
 // Download de documentação em formato Word
 router.get("/:projectId/export/docx", async (req, res) => {
   const { doc } = req.query;
