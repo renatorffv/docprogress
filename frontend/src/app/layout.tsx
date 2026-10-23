@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Documentador Progress 4GL",
+  title: "DocEspec",
   description: "Documentação automatizada de programas Progress 4GL com IA",
 };
 
@@ -44,11 +44,9 @@ export default function RootLayout({
         <header className="bg-white border-b border-gray-200 shadow-sm print:hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <Link href="/" className="flex items-center gap-3">
-                <Image src="/logo.png" alt="Logo" width={40} height={40} className="object-contain" />
-                <span className="font-semibold text-lg">
-                  Documentador Progress 4GL
-                </span>
+              <Link href="/" className="flex items-center">
+                <Image src="/docespec-logo.svg" alt="DocEspec" width={148} height={44} className="object-contain block dark:hidden" />
+                <Image src="/docespec-logo-dark.svg" alt="DocEspec" width={148} height={44} className="object-contain hidden dark:block" />
               </Link>
               <nav className="flex items-center gap-6">
                 <Link

@@ -49,10 +49,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4">
-            <span className="text-white font-bold text-xl">P4</span>
+          <div className="flex justify-center mb-5">
+            <img src="/docespec-icon.svg" alt="DocEspec" className="w-20 h-20" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Documentador Progress 4GL</h1>
+          <img src="/docespec-logo.svg" alt="DocEspec" className="mx-auto h-10 w-auto mb-2" />
           <p className="text-sm text-gray-500 mt-1">Documentação automatizada com IA</p>
         </div>
 

@@ -4,8 +4,11 @@ export default function HomePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-16">
       <div className="text-center mb-16">
+        <div className="flex justify-center mb-6">
+          <img src="/docespec-logo.svg" alt="DocEspec" className="h-16 w-auto" />
+        </div>
         <h1 className="text-4xl font-bold mb-4">
-          Documentador Progress 4GL
+          DocEspec
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Faca upload de seus programas Progress 4GL (.p, .w, .i) e gere
