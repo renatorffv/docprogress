@@ -77,7 +77,7 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                   ref={inputRef}
                   type="file"
                   multiple
-                  accept=".p,.w,.i,.cls,.t,.r"
+                  accept=".p,.w,.i,.cls,.t"
                   className="hidden"
                   onChange={(e) => e.target.files && processFiles(e.target.files)}
                 />
@@ -121,7 +121,7 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                         Pasta
                       </button>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">.p .w .i .cls .t .r</p>
+                    <p className="text-xs text-gray-400 mt-2">.p .w .i .cls .t</p>
                   </>
                 )}
               </div>

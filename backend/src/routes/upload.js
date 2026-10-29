@@ -25,7 +25,7 @@ const upload = multer({
   dest: path.join(__dirname, "..", "uploads", "tmp"),
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const allowed = [".p", ".py", ".w", ".i", ".cls", ".t", ".r"];
+    const allowed = [".p", ".py", ".w", ".i", ".cls", ".t"];
     if (allowed.includes(ext) || /^\.i\d+$/.test(ext)) {
       cb(null, true);
     } else {

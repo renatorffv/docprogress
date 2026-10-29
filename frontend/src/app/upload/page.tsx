@@ -43,7 +43,7 @@ function countFiles(nodes: TreeNode[]): number {
   return nodes.reduce((n, node) => n + (node.type === "file" ? 1 : countFiles(node.children)), 0);
 }
 
-const ALLOWED = new Set([".p", ".py", ".w", ".i", ".cls", ".t", ".r"]);
+const ALLOWED = new Set([".p", ".py", ".w", ".i", ".cls", ".t"]);
 function isAllowed(name: string) {
   const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
   return ALLOWED.has(ext) || /^\.i\d+$/.test(ext);
@@ -188,7 +188,7 @@ export default function UploadPage() {
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".p,.w,.i,.i1,.i2,.i3,.i4,.i5,.i6,.i7,.i8,.i9,.cls,.t,.r"
+          accept=".p,.w,.i,.i1,.i2,.i3,.i4,.i5,.i6,.i7,.i8,.i9,.cls,.t"
           className="hidden"
           onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
         />
@@ -232,7 +232,7 @@ export default function UploadPage() {
             Selecionar Pasta
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-3">Extensões aceitas: .p, .w, .i, .i1~.iN, .cls, .t, .r</p>
+        <p className="text-xs text-gray-400 mt-3">Extensões aceitas: .p, .w, .i, .i1~.iN, .cls, .t</p>
       </div>
 
       {/* Preview dos arquivos selecionados */}
