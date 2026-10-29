@@ -77,42 +77,91 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 }
 
-export async function uploadFiles(files: File[] | FileList, name?: string) {
-  const formData = new FormData();
-  const meta: { name: string; lastModified: number }[] = [];
-  const relPaths: string[] = [];
+// Divide arquivos em lotes de até 3 MB ou 100 arquivos para contornar o limite de proxy do Vercel (~4.5 MB)
+const MAX_BATCH_BYTES = 3 * 1024 * 1024;
+const MAX_BATCH_FILES = 100;
+
+function buildBatches(files: File[], relPaths: string[]): Array<{ files: File[]; relPaths: string[] }> {
+  const batches: Array<{ files: File[]; relPaths: string[] }> = [];
+  let bFiles: File[] = [];
+  let bPaths: string[] = [];
+  let bSize = 0;
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
-    formData.append("files", f);
-    meta.push({ name: f.name, lastModified: f.lastModified });
-    // webkitRelativePath: "rootFolder/ESP/file.p" — strip first component
-    const wp = (f as File & { webkitRelativePath?: string }).webkitRelativePath || "";
-    if (wp) {
-      const parts = wp.split("/");
-      relPaths.push(parts.length > 1 ? parts.slice(1).join("/") : f.name);
+    if (bFiles.length > 0 && (bSize + f.size > MAX_BATCH_BYTES || bFiles.length >= MAX_BATCH_FILES)) {
+      batches.push({ files: bFiles, relPaths: bPaths });
+      bFiles = [];
+      bPaths = [];
+      bSize = 0;
+    }
+    bFiles.push(f);
+    bPaths.push(relPaths[i]);
+    bSize += f.size;
+  }
+  if (bFiles.length > 0) batches.push({ files: bFiles, relPaths: bPaths });
+  return batches;
+}
+
+function extractRelPath(f: File): string {
+  const wp = (f as File & { webkitRelativePath?: string }).webkitRelativePath || "";
+  if (wp) {
+    const parts = wp.split("/");
+    return parts.length > 1 ? parts.slice(1).join("/") : f.name;
+  }
+  return f.name;
+}
+
+export async function uploadFiles(
+  files: File[] | FileList,
+  name?: string,
+  onProgress?: (done: number, total: number) => void
+) {
+  const allFiles = Array.from(files) as File[];
+  const relPaths = allFiles.map(extractRelPath);
+  const batches = buildBatches(allFiles, relPaths);
+  let projectId: string | null = null;
+
+  for (let b = 0; b < batches.length; b++) {
+    const { files: bFiles, relPaths: bPaths } = batches[b];
+    const formData = new FormData();
+    const meta = bFiles.map((f) => ({ name: f.name, lastModified: f.lastModified }));
+    bFiles.forEach((f) => formData.append("files", f));
+    formData.append("filesMetadata", JSON.stringify(meta));
+    formData.append("filesRelativePaths", JSON.stringify(bPaths));
+
+    let res: Response;
+    if (projectId === null) {
+      if (name) formData.append("name", name);
+      res = await fetch(`${CLIENT_API}/api/upload`, {
+        method: "POST",
+        body: formData,
+        headers: authHeaders(),
+      });
     } else {
-      relPaths.push(f.name);
+      res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
+        method: "POST",
+        body: formData,
+        headers: authHeaders(),
+      });
     }
-  }
-  formData.append("filesMetadata", JSON.stringify(meta));
-  formData.append("filesRelativePaths", JSON.stringify(relPaths));
-  if (name) formData.append("name", name);
-  const res = await fetch(`${CLIENT_API}/api/upload`, {
-    method: "POST",
-    body: formData,
-    headers: authHeaders(),
-  });
-  if (!res.ok) {
-    let msg = "Falha no upload";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {
-      msg = `Erro ${res.status}: verifique se o backend está rodando`;
+
+    if (!res.ok) {
+      let msg = "Falha no upload";
+      try {
+        const err = await res.json();
+        msg = err.error || msg;
+      } catch {
+        msg = `Erro ${res.status}: verifique se o backend está rodando`;
+      }
+      throw new Error(msg);
     }
-    throw new Error(msg);
+
+    const data = await res.json();
+    if (projectId === null) projectId = data.projectId;
+    onProgress?.(b + 1, batches.length);
   }
-  return res.json();
+
+  return { projectId };
 }
 
 export async function generateDocFile(projectId: string, fileName: string) {
@@ -206,35 +255,41 @@ export async function fetchTrainingPreviewClient() {
 
 export async function updateProjectFiles(
   projectId: string,
-  files: File[] | FileList
+  files: File[] | FileList,
+  onProgress?: (done: number, total: number) => void
 ): Promise<{ added: string[]; changed: string[]; affectedGroups: string[] }> {
-  const formData = new FormData();
-  const meta: { name: string; lastModified: number }[] = [];
-  const relPaths: string[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    formData.append("files", f);
-    meta.push({ name: f.name, lastModified: f.lastModified });
-    const wp = (f as File & { webkitRelativePath?: string }).webkitRelativePath || "";
-    if (wp) {
-      const parts = wp.split("/");
-      relPaths.push(parts.length > 1 ? parts.slice(1).join("/") : f.name);
-    } else {
-      relPaths.push(f.name);
+  const allFiles = Array.from(files) as File[];
+  const relPaths = allFiles.map(extractRelPath);
+  const batches = buildBatches(allFiles, relPaths);
+  const result = { added: [] as string[], changed: [] as string[], affectedGroups: [] as string[] };
+
+  for (let b = 0; b < batches.length; b++) {
+    const { files: bFiles, relPaths: bPaths } = batches[b];
+    const formData = new FormData();
+    const meta = bFiles.map((f) => ({ name: f.name, lastModified: f.lastModified }));
+    bFiles.forEach((f) => formData.append("files", f));
+    formData.append("filesMetadata", JSON.stringify(meta));
+    formData.append("filesRelativePaths", JSON.stringify(bPaths));
+
+    const res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
+      method: "POST",
+      body: formData,
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      let msg = "Falha na atualização";
+      try { const err = await res.json(); msg = err.error || msg; } catch { /* ignore */ }
+      throw new Error(msg);
     }
+    const data = await res.json();
+    result.added.push(...(data.added || []));
+    result.changed.push(...(data.changed || []));
+    const newGroups = (data.affectedGroups || []) as string[];
+    newGroups.forEach((g: string) => { if (!result.affectedGroups.includes(g)) result.affectedGroups.push(g); });
+    onProgress?.(b + 1, batches.length);
   }
-  formData.append("filesMetadata", JSON.stringify(meta));
-  formData.append("filesRelativePaths", JSON.stringify(relPaths));
-  const res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
-    method: "POST",
-    body: formData,
-    headers: authHeaders(),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Falha na atualização");
-  }
-  return res.json();
+
+  return result;
 }
 
 export async function saveProjectLogo(projectId: string, logoBase64: string | null) {

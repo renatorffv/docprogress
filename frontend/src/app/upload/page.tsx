@@ -114,6 +114,7 @@ function TreeView({ nodes, expanded, toggle }: {
 export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);           // aceitos
   const [trash, setTrash] = useState<{ file: File; reason: string }[]>([]); // lixeira
@@ -213,14 +214,18 @@ export default function UploadPage() {
   async function handleUpload() {
     if (files.length === 0) return;
     setUploading(true);
+    setBatchProgress(null);
     setError(null);
     try {
-      const result = await uploadFiles(files, projectName.trim() || undefined);
+      const result = await uploadFiles(files, projectName.trim() || undefined, (done, total) => {
+        setBatchProgress({ done, total });
+      });
       router.push(`/projects/${result.projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro no upload");
     } finally {
       setUploading(false);
+      setBatchProgress(null);
     }
   }
 
@@ -383,7 +388,11 @@ export default function UploadPage() {
             disabled={uploading}
             className="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            {uploading ? "Enviando..." : `Enviar ${files.length} arquivo${files.length !== 1 ? "s" : ""}`}
+            {uploading
+              ? batchProgress && batchProgress.total > 1
+                ? `Enviando lote ${batchProgress.done} de ${batchProgress.total}...`
+                : "Enviando..."
+              : `Enviar ${files.length} arquivo${files.length !== 1 ? "s" : ""}`}
           </button>
         </div>
       )}

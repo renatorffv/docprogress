@@ -20,22 +20,27 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
   const folderRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function processFiles(files: FileList | File[]) {
     if (!files || files.length === 0) return;
     setLoading(true);
+    setBatchProgress(null);
     setError(null);
     setResult(null);
     try {
-      const res = await updateProjectFiles(projectId, files);
+      const res = await updateProjectFiles(projectId, files, (done, total) => {
+        setBatchProgress({ done, total });
+      });
       setResult(res);
       onDone(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao atualizar fontes");
     } finally {
       setLoading(false);
+      setBatchProgress(null);
     }
   }
 
@@ -97,7 +102,11 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
-                    <span className="text-sm text-gray-600">Analisando arquivos...</span>
+                    <span className="text-sm text-gray-600">
+                    {batchProgress && batchProgress.total > 1
+                      ? `Enviando lote ${batchProgress.done} de ${batchProgress.total}...`
+                      : "Analisando arquivos..."}
+                  </span>
                   </div>
                 ) : (
                   <>
