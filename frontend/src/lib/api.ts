@@ -80,11 +80,22 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
 export async function uploadFiles(files: File[] | FileList, name?: string) {
   const formData = new FormData();
   const meta: { name: string; lastModified: number }[] = [];
+  const relPaths: string[] = [];
   for (let i = 0; i < files.length; i++) {
-    formData.append("files", files[i]);
-    meta.push({ name: files[i].name, lastModified: files[i].lastModified });
+    const f = files[i];
+    formData.append("files", f);
+    meta.push({ name: f.name, lastModified: f.lastModified });
+    // webkitRelativePath: "rootFolder/ESP/file.p" — strip first component
+    const wp = (f as File & { webkitRelativePath?: string }).webkitRelativePath || "";
+    if (wp) {
+      const parts = wp.split("/");
+      relPaths.push(parts.length > 1 ? parts.slice(1).join("/") : f.name);
+    } else {
+      relPaths.push(f.name);
+    }
   }
   formData.append("filesMetadata", JSON.stringify(meta));
+  formData.append("filesRelativePaths", JSON.stringify(relPaths));
   if (name) formData.append("name", name);
   const res = await fetch(`${CLIENT_API}/api/upload`, {
     method: "POST",
@@ -199,11 +210,21 @@ export async function updateProjectFiles(
 ): Promise<{ added: string[]; changed: string[]; affectedGroups: string[] }> {
   const formData = new FormData();
   const meta: { name: string; lastModified: number }[] = [];
+  const relPaths: string[] = [];
   for (let i = 0; i < files.length; i++) {
-    formData.append("files", files[i]);
-    meta.push({ name: files[i].name, lastModified: files[i].lastModified });
+    const f = files[i];
+    formData.append("files", f);
+    meta.push({ name: f.name, lastModified: f.lastModified });
+    const wp = (f as File & { webkitRelativePath?: string }).webkitRelativePath || "";
+    if (wp) {
+      const parts = wp.split("/");
+      relPaths.push(parts.length > 1 ? parts.slice(1).join("/") : f.name);
+    } else {
+      relPaths.push(f.name);
+    }
   }
   formData.append("filesMetadata", JSON.stringify(meta));
+  formData.append("filesRelativePaths", JSON.stringify(relPaths));
   const res = await fetch(`${CLIENT_API}/api/upload/${projectId}/update`, {
     method: "POST",
     body: formData,

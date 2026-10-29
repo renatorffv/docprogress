@@ -16,6 +16,11 @@ function parseMetaMap(raw) {
   }
 }
 
+// Array de caminhos relativos enviados pelo browser (mesmo índice que os arquivos)
+function parseRelativePaths(raw) {
+  try { return JSON.parse(raw || "[]"); } catch { return []; }
+}
+
 const upload = multer({
   dest: path.join(__dirname, "..", "uploads", "tmp"),
   fileFilter: (req, file, cb) => {
@@ -43,7 +48,8 @@ router.post("/", (req, res) => {
       const projectId = uuidv4();
       const name = typeof req.body.name === "string" ? req.body.name.trim() : null;
       const metaMap = parseMetaMap(req.body.filesMetadata);
-      const manifest = saveProject(projectId, req.files, name || null, metaMap);
+      const relPaths = parseRelativePaths(req.body.filesRelativePaths);
+      const manifest = saveProject(projectId, req.files, name || null, metaMap, relPaths);
 
       res.json({
         projectId,
@@ -65,7 +71,8 @@ router.post("/:projectId/update", (req, res) => {
         return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
       const metaMap = parseMetaMap(req.body.filesMetadata);
-      const result = updateProjectFiles(req.params.projectId, req.files, metaMap);
+      const relPaths = parseRelativePaths(req.body.filesRelativePaths);
+      const result = updateProjectFiles(req.params.projectId, req.files, metaMap, relPaths);
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });

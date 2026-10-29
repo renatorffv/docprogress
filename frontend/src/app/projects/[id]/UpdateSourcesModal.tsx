@@ -17,6 +17,7 @@ interface Props {
 
 export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
@@ -68,7 +69,6 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                   setDragging(false);
                   processFiles(e.dataTransfer.files);
                 }}
-                onClick={() => inputRef.current?.click()}
                 className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
                   dragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
                 }`}
@@ -78,6 +78,16 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                   type="file"
                   multiple
                   accept=".p,.w,.i,.cls,.t,.r"
+                  className="hidden"
+                  onChange={(e) => e.target.files && processFiles(e.target.files)}
+                />
+                <input
+                  ref={folderRef}
+                  type="file"
+                  // @ts-expect-error webkitdirectory
+                  webkitdirectory="true"
+                  mozdirectory="true"
+                  multiple
                   className="hidden"
                   onChange={(e) => e.target.files && processFiles(e.target.files)}
                 />
@@ -94,8 +104,24 @@ export default function UpdateSourcesModal({ projectId, onClose, onDone }: Props
                     <svg className="w-10 h-10 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <p className="text-sm font-medium text-gray-700">Arraste os arquivos ou clique para selecionar</p>
-                    <p className="text-xs text-gray-400 mt-1">.p .w .i .cls .t .r</p>
+                    <p className="text-sm font-medium text-gray-700 mb-3">Arraste arquivos ou selecione:</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+                        className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      >
+                        Arquivos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); folderRef.current?.click(); }}
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                      >
+                        Pasta
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">.p .w .i .cls .t .r</p>
                   </>
                 )}
               </div>

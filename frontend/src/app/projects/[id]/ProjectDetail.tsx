@@ -7,6 +7,7 @@ import { generateDocFile, startDocProject, pollDocProject, renameProject, savePr
 import { authHeader } from "@/lib/auth";
 import ProgramsTab from "./ProgramsTab";
 import UpdateSourcesModal from "./UpdateSourcesModal";
+import FileTree from "./FileTree";
 
 interface ProjectDetailProps {
   projectId: string;
@@ -48,7 +49,6 @@ export default function ProjectDetail({
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [fileSort, setFileSort] = useState<{ by: "name" | "date"; dir: "asc" | "desc" }>({ by: "name", dir: "asc" });
   const [needsRedocFiles, setNeedsRedocFiles] = useState<Set<string>>(
     () => new Set(project.files.filter((f) => f.needsRedoc).map((f) => f.name))
   );
@@ -587,67 +587,22 @@ export default function ProjectDetail({
           )}
           {tab === "files" ? (
             <div>
-              {/* Controles de ordenação */}
-              <div className="flex items-center gap-1 mb-2 px-1">
-                {(["name", "date"] as const).map((col) => (
-                  <button
-                    key={col}
-                    onClick={() => setFileSort((s) =>
-                      s.by === col ? { by: col, dir: s.dir === "asc" ? "desc" : "asc" } : { by: col, dir: "asc" }
-                    )}
-                    className={`flex items-center gap-0.5 px-2 py-1 rounded text-xs font-medium transition ${
-                      fileSort.by === col ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"
-                    }`}
-                  >
-                    {col === "name" ? "Nome" : "Data"}
-                    {fileSort.by === col && (
-                      <span className="text-[10px]">{fileSort.dir === "asc" ? " ↑" : " ↓"}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <ul className="space-y-1">
-                {[...files]
-                  .sort((a, b) => {
-                    if (fileSort.by === "name") {
-                      return fileSort.dir === "asc"
-                        ? a.name.localeCompare(b.name)
-                        : b.name.localeCompare(a.name);
-                    }
-                    const mA = project.files.find((f) => f.name === a.name);
-                    const mB = project.files.find((f) => f.name === b.name);
-                    const dA = new Date(mA?.fileModifiedAt || mA?.changedAt || mA?.uploadedAt || 0).getTime();
-                    const dB = new Date(mB?.fileModifiedAt || mB?.changedAt || mB?.uploadedAt || 0).getTime();
-                    return fileSort.dir === "asc" ? dA - dB : dB - dA;
-                  })
-                  .map((file) => {
-                    const meta = project.files.find((f) => f.name === file.name);
-                    // Preferência: data real do arquivo > data de re-upload > data de upload inicial
-                    const displayDate = meta?.fileModifiedAt || meta?.changedAt || meta?.uploadedAt;
-                    const isChanged = !!meta?.changedAt;
-                    return (
-                      <li key={file.name}>
-                        <button
-                          onClick={() => setSelectedFile(file.name)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${
-                            selectedFile === file.name
-                              ? "bg-blue-100 text-blue-700"
-                              : "hover:bg-gray-100"
-                          }`}
-                        >
-                          <span className="font-mono block">{file.name}</span>
-                          <span className="text-xs text-gray-400">{file.lines} linhas</span>
-                          {displayDate && (
-                            <span className={`text-xs block mt-0.5 ${isChanged ? "text-yellow-600" : "text-gray-400"}`}>
-                              {meta?.fileModifiedAt ? "Modificado " : isChanged ? "Alterado " : "Enviado "}
-                              {new Date(displayDate).toLocaleDateString("pt-BR")}
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-              </ul>
+              <FileTree
+                files={files}
+                selectedFile={selectedFile}
+                onSelect={setSelectedFile}
+                fileMeta={(name) => {
+                  const meta = project.files.find((f) => f.name === name);
+                  if (!meta) return null;
+                  const displayDate = meta.fileModifiedAt || meta.changedAt || meta.uploadedAt;
+                  const isChanged = !!meta.changedAt;
+                  return {
+                    displayDate: displayDate ?? undefined,
+                    isChanged,
+                    label: meta.fileModifiedAt ? "Modificado" : isChanged ? "Alterado" : "Enviado",
+                  };
+                }}
+              />
             </div>
           ) : (
             <ul className="space-y-1">

@@ -10,7 +10,7 @@ function computeHash(filePath) {
   return crypto.createHash("md5").update(fs.readFileSync(filePath)).digest("hex");
 }
 
-function saveProject(projectId, files, name, metaMap = {}) {
+function saveProject(projectId, files, name, metaMap = {}, relPaths = []) {
   const projectDir = path.join(UPLOADS_DIR, projectId);
   fs.mkdirSync(projectDir, { recursive: true });
 
@@ -21,12 +21,16 @@ function saveProject(projectId, files, name, metaMap = {}) {
     files: [],
   };
 
-  for (const file of files) {
-    const filePath = path.join(projectDir, file.originalname);
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    // relativePath usa barras normais; fallback para basename quando não há estrutura de dirs
+    const relativePath = (relPaths[i] || file.originalname).replace(/\\/g, "/");
+    const filePath = path.join(projectDir, ...relativePath.split("/"));
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.copyFileSync(file.path, filePath);
     const lastMod = metaMap[file.originalname];
     manifest.files.push({
-      name: file.originalname,
+      name: relativePath,          // ex: "ESP/esft0001.p" ou "esft0001.p"
       size: file.size,
       path: filePath,
       contentHash: computeHash(filePath),
@@ -47,7 +51,7 @@ function saveProject(projectId, files, name, metaMap = {}) {
 }
 
 // Atualiza fontes existentes e adiciona novos. Retorna { added, changed, affected }
-function updateProjectFiles(projectId, newFiles, metaMap = {}) {
+function updateProjectFiles(projectId, newFiles, metaMap = {}, relPaths = []) {
   const manifest = getProject(projectId);
   if (!manifest) throw new Error("Projeto não encontrado");
 
@@ -56,11 +60,14 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
   const added = [];
   const changed = [];
 
-  for (const file of newFiles) {
-    const destPath = path.join(projectDir, file.originalname);
+  for (let i = 0; i < newFiles.length; i++) {
+    const file = newFiles[i];
+    const relativePath = (relPaths[i] || file.originalname).replace(/\\/g, "/");
+    const destPath = path.join(projectDir, ...relativePath.split("/"));
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
     const lastMod = metaMap[file.originalname];
     const fileModifiedAt = lastMod ? new Date(lastMod).toISOString() : null;
-    const existing = manifest.files.find((f) => f.name === file.originalname);
+    const existing = manifest.files.find((f) => f.name === relativePath);
 
     // Lê conteúdo antigo ANTES de sobrescrever (necessário para calcular diff)
     let oldContent = null;
@@ -74,7 +81,7 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
 
     if (!existing) {
       manifest.files.push({
-        name: file.originalname,
+        name: relativePath,
         size: file.size,
         path: destPath,
         contentHash: newHash,
@@ -84,13 +91,13 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
         changedAt: now,
         diffPatch: null,
       });
-      added.push(file.originalname);
+      added.push(relativePath);
     } else if (existing.contentHash !== newHash) {
       // Calcula diff entre conteúdo antigo e novo
       if (oldContent !== null) {
         try {
           const newContent = fs.readFileSync(destPath, "utf-8");
-          const raw = createPatch(file.originalname, oldContent, newContent, "", "");
+          const raw = createPatch(relativePath, oldContent, newContent, "", "");
           existing.diffPatch = raw.length > 8000 ? raw.slice(0, 8000) + "\n...(diff truncado)" : raw;
         } catch {
           existing.diffPatch = null;
@@ -101,7 +108,7 @@ function updateProjectFiles(projectId, newFiles, metaMap = {}) {
       existing.fileModifiedAt = fileModifiedAt;
       existing.needsRedoc = true;
       existing.changedAt = now;
-      changed.push(file.originalname);
+      changed.push(relativePath);
     }
     // hash igual = sem alteração, ignora
   }
