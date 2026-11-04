@@ -289,6 +289,15 @@ function getAnalysis(projectId) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
+function deleteProject(projectId) {
+  const projectDir = path.join(UPLOADS_DIR, projectId);
+  if (!fs.existsSync(projectDir)) return false;
+  fs.rmSync(projectDir, { recursive: true, force: true });
+  const docsDir = path.join(DOCS_DIR, projectId);
+  if (fs.existsSync(docsDir)) fs.rmSync(docsDir, { recursive: true, force: true });
+  return true;
+}
+
 module.exports = {
   saveProject,
   updateProjectFiles,
@@ -306,4 +315,5 @@ module.exports = {
   updateGroupDescription,
   saveAnalysis,
   getAnalysis,
+  deleteProject,
 };

@@ -391,6 +391,15 @@ export async function startDocGroup(
   return jobId;
 }
 
+export async function deleteProject(projectId: string) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Falha ao deletar projeto");
+  return res.json();
+}
+
 export async function saveCompanySettings(data: unknown) {
   const res = await fetch(`${CLIENT_API}/api/settings`, {
     method: "PUT",
