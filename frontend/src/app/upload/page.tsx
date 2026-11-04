@@ -96,7 +96,7 @@ function TreeView({ nodes, expanded, toggle, onRemoveFile, onRemoveDir }: {
       {nodes.map((node) =>
         node.type === "dir" ? (
           <li key={node.path} className="group">
-            <div className="flex items-center gap-1 w-full">
+            <div className="flex items-center gap-1 w-full rounded-lg hover:bg-red-50 transition px-1 -mx-1">
               <button onClick={() => toggle(node.path)}
                 className="flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition py-0.5 flex-1 text-left min-w-0">
                 <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-gray-400 ${expanded.has(node.path) ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20">
@@ -117,7 +117,7 @@ function TreeView({ nodes, expanded, toggle, onRemoveFile, onRemoveDir }: {
             )}
           </li>
         ) : (
-          <li key={getFileKey(node.file)} className="group flex items-center gap-1.5 text-sm text-gray-600 py-0.5 pl-1">
+          <li key={getFileKey(node.file)} className="group flex items-center gap-1.5 text-sm text-gray-600 py-0.5 pl-1 rounded-lg hover:bg-red-50 transition pr-1">
             <svg className="w-4 h-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -420,7 +420,7 @@ export default function UploadPage() {
             ) : (
               <ul className="space-y-1">
                 {files.map((file) => (
-                  <li key={getFileKey(file)} className="group flex items-center justify-between text-sm">
+                  <li key={getFileKey(file)} className="group flex items-center justify-between text-sm rounded-lg hover:bg-red-50 transition px-2 -mx-2 py-0.5 -my-0.5">
                     <span className="font-mono truncate mr-2">{getFileKey(file)}</span>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
