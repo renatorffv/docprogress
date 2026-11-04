@@ -391,6 +391,16 @@ export async function startDocGroup(
   return jobId;
 }
 
+export async function saveProjectIncludeMockups(projectId: string, includeMockups: boolean) {
+  const res = await fetch(`${CLIENT_API}/api/projects/${projectId}/include-mockups`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ includeMockups }),
+  });
+  if (!res.ok) throw new Error("Falha ao salvar configuração de wireframes");
+  return res.json();
+}
+
 export async function deleteProject(projectId: string) {
   const res = await fetch(`${CLIENT_API}/api/projects/${projectId}`, {
     method: "DELETE",

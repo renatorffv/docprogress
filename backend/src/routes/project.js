@@ -1,5 +1,5 @@
 const express = require("express");
-const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription, saveProjectLogo, saveProjectShowConfigLogo, saveProjectIncludeSuggestions, deleteProject } = require("../services/storage");
+const { listProjects, getProject, getProjectFiles, renameProject, saveProjectDescription, saveProjectLogo, saveProjectShowConfigLogo, saveProjectIncludeSuggestions, saveProjectIncludeMockups, deleteProject } = require("../services/storage");
 
 const router = express.Router();
 
@@ -63,6 +63,13 @@ router.patch("/:id/include-suggestions", (req, res) => {
   const manifest = saveProjectIncludeSuggestions(req.params.id, includeSuggestions);
   if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
   res.json({ id: manifest.id, includeSuggestions: manifest.includeSuggestions });
+});
+
+router.patch("/:id/include-mockups", (req, res) => {
+  const { includeMockups } = req.body;
+  const manifest = saveProjectIncludeMockups(req.params.id, includeMockups);
+  if (!manifest) return res.status(404).json({ error: "Projeto não encontrado" });
+  res.json({ id: manifest.id, includeMockups: manifest.includeMockups });
 });
 
 router.delete("/:id", (req, res) => {

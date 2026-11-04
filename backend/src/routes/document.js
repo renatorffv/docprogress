@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { documentCode, documentProject, analyzeProjectGroups, documentGroup } = require("../services/ai");
+const { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup } = require("../services/ai");
 const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc, updateGroupDescription } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
@@ -9,6 +9,14 @@ const { markdownToDocx } = require("../services/docxExport");
 const { markdownToPdf, markdownToPdfBatch } = require("../services/pdfExport");
 
 const router = express.Router();
+
+// Injeta o wireframe HTML logo após o primeiro título (# ...) da documentação
+function injectMockup(markdown, html) {
+  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${html}\n</div>\n`;
+  const firstH2 = markdown.indexOf("\n## ");
+  if (firstH2 !== -1) return markdown.slice(0, firstH2) + section + markdown.slice(firstH2);
+  return markdown + section;
+}
 
 // Monta o objeto de settings para exportação, respeitando a lógica de logos por projeto
 function buildExportSettings(baseSettings, projectMeta) {
@@ -100,9 +108,14 @@ router.post("/file", async (req, res) => {
 
     const projectMeta = getProject(projectId);
     const options = { includeSuggestions: projectMeta?.includeSuggestions !== false };
-    const markdown = await documentCode(file.content, file.name, options);
-    const doc = saveDocumentation(projectId, file.name, markdown);
+    let markdown = await documentCode(file.content, file.name, options);
 
+    if (projectMeta?.includeMockups && file.name.toLowerCase().endsWith(".w")) {
+      const html = await generateMockup(file.content, file.name).catch(() => null);
+      if (html) markdown = injectMockup(markdown, html);
+    }
+
+    const doc = saveDocumentation(projectId, file.name, markdown);
     res.json({ fileName: doc.fileName, documentation: markdown });
   } catch (err) {
     console.error("Erro ao documentar arquivo:", err);
@@ -244,7 +257,7 @@ router.post("/group", (req, res) => {
         .filter(Boolean);
 
       const options = { includeSuggestions: manifest?.includeSuggestions !== false };
-      const markdown = await documentGroup(
+      let markdown = await documentGroup(
         groupFiles,
         groupName || groupId,
         groupType || "outro",
@@ -256,6 +269,17 @@ router.post("/group", (req, res) => {
         changedFiles,
         options
       );
+
+      if (manifest?.includeMockups) {
+        const wFile = groupFiles.find((f) => f.name.toLowerCase().endsWith(".w"));
+        if (wFile) {
+          const cur = getJob(jobId) || {};
+          setJob(jobId, { ...cur, message: "Gerando wireframe da tela..." });
+          const html = await generateMockup(wFile.content, wFile.name).catch(() => null);
+          if (html) markdown = injectMockup(markdown, html);
+        }
+      }
+
       const doc = saveDocumentation(projectId, `_grp_${groupId}`, markdown);
       clearNeedsRedoc(projectId, fileNames);
       setJob(jobId, {

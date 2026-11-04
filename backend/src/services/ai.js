@@ -591,4 +591,52 @@ async function documentGroup(groupFiles, groupName, groupType, groupDescription,
   return finalDoc;
 }
 
-module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup };
+/**
+ * Gera um wireframe HTML representando a tela de um arquivo .w Progress 4GL.
+ * Retorna uma string HTML pronta para embutir no markdown.
+ */
+async function generateMockup(fileContent, fileName) {
+  const systemPrompt = buildSystemPrompt();
+
+  const prompt = `Você é um especialista em Progress 4GL. Analise o código abaixo e gere um wireframe HTML que represente visualmente a interface gráfica do programa.
+
+REGRAS OBRIGATÓRIAS:
+- Retorne APENAS um único <div> HTML com estilos inline — sem CSS externo, sem JS, sem imports
+- Estilo wireframe minimalista: fundo #f8f9fa, bordas #ced4da, texto #343a40
+- Inclua uma barra de título no topo (fundo #495057, texto branco, padding 8px 12px) com o nome: ${path.basename(fileName)}
+- Represente fielmente os elementos encontrados: labels, campos de texto (FILL-IN), dropdowns (COMBO-BOX), botões (BUTTON), grids/browsers (BROWSE), checkboxes (TOGGLE-BOX), abas (TAB-CONTROL), frames
+- Campos de texto: bordas #adb5bd, fundo branco, padding 4px 8px, border-radius 3px
+- Botões: fundo #6c757d, texto branco, padding 4px 12px, border-radius 3px, sem cursor especial
+- Largura máxima 680px, altura automática conforme conteúdo
+- NÃO inclua doctype, html, head ou body — apenas o <div> raiz
+- Se o arquivo não tiver interface gráfica (sem FRAME ou WINDOW), retorne: <div style="display:none"></div>
+
+ARQUIVO: ${fileName}
+
+\`\`\`progress
+${fileContent.slice(0, 8000)}
+\`\`\`
+
+Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
+
+  const message = await callWithRetry(
+    () => client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 2048,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: prompt }],
+    })
+  );
+
+  const html = message.content[0].text.trim()
+    .replace(/^```(?:html)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+
+  // Se a IA devolveu marcação invisível, não há tela para mostrar
+  if (html.includes('display:none') || html.length < 50) return null;
+
+  return html;
+}
+
+module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup };

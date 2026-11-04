@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 interface Props {
   docName: string;
@@ -100,7 +101,7 @@ function DocumentBody({
 
       {/* Conteúdo da documentação */}
       <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-code:text-sm prose-table:text-sm">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
       </div>
 
       {/* Rodapé */}
