@@ -206,17 +206,34 @@ export default function UploadPage() {
     });
   }
 
-  // Remove um arquivo específico da lista de envio
+  // Move um arquivo da lista de envio para a Lixeira
   function removeFile(key: string) {
-    setFiles((prev) => prev.filter((f) => getFileKey(f) !== key));
+    setFiles((prev) => {
+      const file = prev.find((f) => getFileKey(f) === key);
+      if (file) {
+        setTrash((t) => [...t, { file, reason: "removido manualmente" }]);
+        setTrashOpen(true);
+      }
+      return prev.filter((f) => getFileKey(f) !== key);
+    });
   }
 
-  // Remove todos os arquivos de um diretório (e subdirs)
+  // Move todos os arquivos de um diretório (e subdirs) para a Lixeira
   function removeDir(dirPath: string) {
-    setFiles((prev) => prev.filter((f) => {
-      const key = getFileKey(f);
-      return !key.startsWith(dirPath + "/") && key !== dirPath;
-    }));
+    setFiles((prev) => {
+      const removed = prev.filter((f) => {
+        const k = getFileKey(f);
+        return k.startsWith(dirPath + "/") || k === dirPath;
+      });
+      if (removed.length > 0) {
+        setTrash((t) => [...t, ...removed.map((f) => ({ file: f, reason: "removido manualmente" }))]);
+        setTrashOpen(true);
+      }
+      return prev.filter((f) => {
+        const k = getFileKey(f);
+        return !k.startsWith(dirPath + "/") && k !== dirPath;
+      });
+    });
   }
 
   // Restaura um arquivo da lixeira para a lista de aceitos
