@@ -12,7 +12,12 @@ const router = express.Router();
 
 // Injeta o wireframe HTML logo após o primeiro título (# ...) da documentação
 function injectMockup(markdown, html) {
-  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${html}\n</div>\n`;
+  // Garante que o HTML não tenha comentários nem linhas em branco — ambos quebram blocos HTML no CommonMark
+  const cleanHtml = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${cleanHtml}\n</div>\n`;
   const firstH2 = markdown.indexOf("\n## ");
   if (firstH2 !== -1) return markdown.slice(0, firstH2) + section + markdown.slice(firstH2);
   return markdown + section;

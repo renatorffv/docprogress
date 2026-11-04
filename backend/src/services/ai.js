@@ -609,6 +609,8 @@ REGRAS OBRIGATÓRIAS:
 - Botões: fundo #6c757d, texto branco, padding 4px 12px, border-radius 3px, sem cursor especial
 - Largura máxima 680px, altura automática conforme conteúdo
 - NÃO inclua doctype, html, head ou body — apenas o <div> raiz
+- NÃO inclua comentários HTML (<!-- -->) — eles quebram o parser de markdown
+- NÃO deixe linhas em branco entre elementos — use apenas quebras de linha simples
 - Se o arquivo não tiver interface gráfica (sem FRAME ou WINDOW), retorne: <div style="display:none"></div>
 
 ARQUIVO: ${fileName}
@@ -628,10 +630,16 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
     })
   );
 
-  const html = message.content[0].text.trim()
+  let html = message.content[0].text.trim()
     .replace(/^```(?:html)?\s*/i, "")
     .replace(/\s*```\s*$/i, "")
     .trim();
+
+  // Remove comentários HTML — causam problemas no parser de markdown
+  html = html.replace(/<!--[\s\S]*?-->/g, "");
+
+  // Colapsa linhas em branco — linha vazia dentro de bloco HTML termina o bloco no CommonMark
+  html = html.replace(/\n{2,}/g, "\n");
 
   // Se a IA devolveu marcação invisível, não há tela para mostrar
   if (html.includes('display:none') || html.length < 50) return null;
