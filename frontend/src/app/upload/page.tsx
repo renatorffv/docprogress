@@ -208,32 +208,28 @@ export default function UploadPage() {
 
   // Move um arquivo da lista de envio para a Lixeira
   function removeFile(key: string) {
-    setFiles((prev) => {
-      const file = prev.find((f) => getFileKey(f) === key);
-      if (file) {
-        setTrash((t) => [...t, { file, reason: "removido manualmente" }]);
-        setTrashOpen(true);
-      }
-      return prev.filter((f) => getFileKey(f) !== key);
-    });
+    const file = files.find((f) => getFileKey(f) === key);
+    setFiles((prev) => prev.filter((f) => getFileKey(f) !== key));
+    if (file) {
+      setTrash((t) => [...t, { file, reason: "removido manualmente" }]);
+      setTrashOpen(true);
+    }
   }
 
   // Move todos os arquivos de um diretório (e subdirs) para a Lixeira
   function removeDir(dirPath: string) {
-    setFiles((prev) => {
-      const removed = prev.filter((f) => {
-        const k = getFileKey(f);
-        return k.startsWith(dirPath + "/") || k === dirPath;
-      });
-      if (removed.length > 0) {
-        setTrash((t) => [...t, ...removed.map((f) => ({ file: f, reason: "removido manualmente" }))]);
-        setTrashOpen(true);
-      }
-      return prev.filter((f) => {
-        const k = getFileKey(f);
-        return !k.startsWith(dirPath + "/") && k !== dirPath;
-      });
+    const removed = files.filter((f) => {
+      const k = getFileKey(f);
+      return k.startsWith(dirPath + "/") || k === dirPath;
     });
+    setFiles((prev) => prev.filter((f) => {
+      const k = getFileKey(f);
+      return !k.startsWith(dirPath + "/") && k !== dirPath;
+    }));
+    if (removed.length > 0) {
+      setTrash((t) => [...t, ...removed.map((f) => ({ file: f, reason: "removido manualmente" }))]);
+      setTrashOpen(true);
+    }
   }
 
   // Restaura um arquivo da lixeira para a lista de aceitos
