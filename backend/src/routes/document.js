@@ -13,11 +13,17 @@ const router = express.Router();
 // Injeta o wireframe HTML logo após o primeiro título (# ...) da documentação
 function injectMockup(markdown, html) {
   // Garante que o HTML não tenha comentários nem linhas em branco — ambos quebram blocos HTML no CommonMark
-  const cleanHtml = html
+  let cleanHtml = html
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\n{2,}/g, "\n")
     .trim();
-  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${cleanHtml}\n</div>\n`;
+  // Equilibra <div> sem fechar — se o AI omitir um </div>, nosso wrapper </div> fecha o div errado
+  // e o mockup-frame fica aberto, engolindo todo o conteúdo seguinte
+  const opens = (cleanHtml.match(/<div[\s>]/gi) || []).length;
+  const closes = (cleanHtml.match(/<\/div>/gi) || []).length;
+  if (opens > closes) cleanHtml += "</div>".repeat(opens - closes);
+  // \n\n após </div> garante linha em branco para terminar o bloco HTML no CommonMark
+  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${cleanHtml}\n</div>\n\n`;
   const firstH2 = markdown.indexOf("\n## ");
   if (firstH2 !== -1) return markdown.slice(0, firstH2) + section + markdown.slice(firstH2);
   return markdown + section;
