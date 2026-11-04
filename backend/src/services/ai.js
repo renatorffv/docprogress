@@ -1,4 +1,5 @@
 const Anthropic = require("@anthropic-ai/sdk");
+const path = require("path");
 const { buildSystemPrompt } = require("./training");
 
 const client = new Anthropic();
@@ -376,6 +377,8 @@ ${graphLines.join("\n")}
 RESUMO DO CONTEÚDO DOS ARQUIVOS:
 ${summaries}
 
+IMPORTANTE: Use o nome EXATO do arquivo como aparece nos resumos acima, incluindo o caminho relativo completo se houver (ex: "subdir/arquivo.p", não apenas "arquivo.p").
+
 Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
 {
   "groups": [
@@ -383,8 +386,8 @@ Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
       "id": "identificador_sem_extensao",
       "name": "Nome descritivo em português",
       "type": "relatorio|tela|procedure|util|outro",
-      "mainFile": "arquivo_principal.ext",
-      "files": ["arquivo1.ext", "arquivo2.ext"],
+      "mainFile": "subdir/arquivo_principal.ext",
+      "files": ["subdir/arquivo1.ext", "subdir/arquivo2.ext"],
       "description": "Descrição breve do que este programa faz (1-2 frases)"
     }
   ]
@@ -410,7 +413,25 @@ Retorne APENAS um JSON válido, sem markdown, sem explicações, no formato:
 
   try {
     const result = JSON.parse(clean);
-    return result.groups || [];
+    const groups = result.groups || [];
+
+    // Normaliza nomes: se a IA devolveu apenas o basename sem o caminho relativo,
+    // tenta resolver para o nome completo usando o índice dos arquivos do projeto.
+    const pathByBasename = new Map();
+    for (const f of files) {
+      const base = path.basename(f.name).toLowerCase();
+      if (!pathByBasename.has(base)) pathByBasename.set(base, f.name);
+    }
+    function resolveFileName(name) {
+      if (!name) return name;
+      if (files.some((f) => f.name === name)) return name; // já é o caminho exato
+      return pathByBasename.get(path.basename(name).toLowerCase()) || name;
+    }
+    return groups.map((g) => ({
+      ...g,
+      mainFile: resolveFileName(g.mainFile),
+      files: (g.files || []).map(resolveFileName),
+    }));
   } catch {
     throw new Error("A IA retornou um formato inesperado. Tente novamente.");
   }

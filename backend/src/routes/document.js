@@ -216,7 +216,17 @@ router.post("/group", (req, res) => {
   const allFiles = getProjectFiles(projectId);
   if (!allFiles) return res.status(404).json({ error: "Projeto não encontrado" });
 
-  const groupFiles = allFiles.filter((f) => fileNames.includes(f.name));
+  // Tenta match exato primeiro; fallback por basename para projetos com diretórios
+  const pathByBasename = new Map();
+  for (const f of allFiles) {
+    const base = path.basename(f.name).toLowerCase();
+    if (!pathByBasename.has(base)) pathByBasename.set(base, f.name);
+  }
+  const resolvedNames = fileNames.map((fn) => {
+    if (allFiles.some((f) => f.name === fn)) return fn;
+    return pathByBasename.get(path.basename(fn).toLowerCase()) || fn;
+  });
+  const groupFiles = allFiles.filter((f) => resolvedNames.includes(f.name));
   if (groupFiles.length === 0) return res.status(404).json({ error: "Nenhum arquivo do grupo encontrado" });
 
   pruneJobs();
