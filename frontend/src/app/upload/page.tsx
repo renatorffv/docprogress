@@ -70,39 +70,59 @@ function getBaseName(f: File) {
 }
 
 // ── Componente árvore ──────────────────────────────────────────────────────
-function TreeView({ nodes, expanded, toggle }: {
+function RemoveBtn({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="invisible group-hover:visible p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition shrink-0"
+      title={title}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
+function TreeView({ nodes, expanded, toggle, onRemoveFile, onRemoveDir }: {
   nodes: TreeNode[];
   expanded: Set<string>;
   toggle: (p: string) => void;
+  onRemoveFile: (key: string) => void;
+  onRemoveDir: (dirPath: string) => void;
 }) {
   return (
     <ul className="space-y-0.5">
       {nodes.map((node) =>
         node.type === "dir" ? (
-          <li key={node.path}>
-            <button onClick={() => toggle(node.path)}
-              className="flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition py-0.5 w-full text-left">
-              <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-gray-400 ${expanded.has(node.path) ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20">
-                <path d="M7 5l6 5-6 5V5z" />
-              </svg>
-              <svg className="w-4 h-4 shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              <span>{node.name}</span>
-              <span className="text-xs text-gray-400 font-normal">({countFiles(node.children)})</span>
-            </button>
+          <li key={node.path} className="group">
+            <div className="flex items-center gap-1 w-full">
+              <button onClick={() => toggle(node.path)}
+                className="flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition py-0.5 flex-1 text-left min-w-0">
+                <svg className={`w-3.5 h-3.5 shrink-0 transition-transform text-gray-400 ${expanded.has(node.path) ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M7 5l6 5-6 5V5z" />
+                </svg>
+                <svg className="w-4 h-4 shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                </svg>
+                <span className="truncate">{node.name}</span>
+                <span className="text-xs text-gray-400 font-normal shrink-0">({countFiles(node.children)})</span>
+              </button>
+              <RemoveBtn onClick={() => onRemoveDir(node.path)} title={`Remover pasta "${node.name}" e todos os seus arquivos`} />
+            </div>
             {expanded.has(node.path) && (
               <div className="pl-5 border-l border-gray-100 ml-2">
-                <TreeView nodes={node.children} expanded={expanded} toggle={toggle} />
+                <TreeView nodes={node.children} expanded={expanded} toggle={toggle} onRemoveFile={onRemoveFile} onRemoveDir={onRemoveDir} />
               </div>
             )}
           </li>
         ) : (
-          <li key={node.name} className="flex items-center gap-1.5 text-sm text-gray-600 py-0.5 pl-1">
+          <li key={getFileKey(node.file)} className="group flex items-center gap-1.5 text-sm text-gray-600 py-0.5 pl-1">
             <svg className="w-4 h-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <span className="font-mono">{node.name}</span>
+            <span className="font-mono flex-1 truncate">{node.name}</span>
+            <RemoveBtn onClick={() => onRemoveFile(getFileKey(node.file))} title={`Remover ${node.name}`} />
           </li>
         )
       )}
@@ -184,6 +204,19 @@ export default function UploadPage() {
       });
       return [...prevFiles, ...toAdd];
     });
+  }
+
+  // Remove um arquivo específico da lista de envio
+  function removeFile(key: string) {
+    setFiles((prev) => prev.filter((f) => getFileKey(f) !== key));
+  }
+
+  // Remove todos os arquivos de um diretório (e subdirs)
+  function removeDir(dirPath: string) {
+    setFiles((prev) => prev.filter((f) => {
+      const key = getFileKey(f);
+      return !key.startsWith(dirPath + "/") && key !== dirPath;
+    }));
   }
 
   // Restaura um arquivo da lixeira para a lista de aceitos
@@ -370,13 +403,24 @@ export default function UploadPage() {
 
           <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 max-h-64 overflow-y-auto">
             {hasTree ? (
-              <TreeView nodes={tree} expanded={expanded} toggle={toggle} />
+              <TreeView nodes={tree} expanded={expanded} toggle={toggle} onRemoveFile={removeFile} onRemoveDir={removeDir} />
             ) : (
               <ul className="space-y-1">
                 {files.map((file) => (
-                  <li key={getFileKey(file)} className="flex items-center justify-between text-sm">
-                    <span className="font-mono truncate mr-4">{getFileKey(file)}</span>
-                    <span className="text-gray-400 shrink-0">{(file.size / 1024).toFixed(1)} KB</span>
+                  <li key={getFileKey(file)} className="group flex items-center justify-between text-sm">
+                    <span className="font-mono truncate mr-2">{getFileKey(file)}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
+                      <button
+                        onClick={() => removeFile(getFileKey(file))}
+                        className="invisible group-hover:visible p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition"
+                        title={`Remover ${file.name}`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
