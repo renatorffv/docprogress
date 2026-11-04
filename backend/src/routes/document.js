@@ -10,6 +10,31 @@ const { markdownToPdf, markdownToPdfBatch } = require("../services/pdfExport");
 
 const router = express.Router();
 
+// Fecha todas as tags HTML abertas sem fechar usando uma pilha (mais robusto que contar divs)
+function balanceHtmlTags(html) {
+  const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+  const stack = [];
+  const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)(\s+(?:[^"'>]|"[^"]*"|'[^']*')*)?(\s*\/?)>/g;
+  let m;
+  while ((m = tagRe.exec(html)) !== null) {
+    const isClosing = m[1] === '/';
+    const name = m[2].toLowerCase();
+    const selfClose = m[4] === '/';
+    if (VOID.has(name) || selfClose) continue;
+    if (isClosing) {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i] === name) { stack.splice(i, 1); break; }
+      }
+    } else {
+      stack.push(name);
+    }
+  }
+  for (let i = stack.length - 1; i >= 0; i--) {
+    html += `</${stack[i]}>`;
+  }
+  return html;
+}
+
 // Injeta o wireframe HTML logo após o primeiro título (# ...) da documentação
 function injectMockup(markdown, html) {
   // Garante que o HTML não tenha comentários nem linhas em branco — ambos quebram blocos HTML no CommonMark
@@ -17,13 +42,10 @@ function injectMockup(markdown, html) {
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\n{2,}/g, "\n")
     .trim();
-  // Equilibra <div> sem fechar — se o AI omitir um </div>, nosso wrapper </div> fecha o div errado
-  // e o mockup-frame fica aberto, engolindo todo o conteúdo seguinte
-  const opens = (cleanHtml.match(/<div[\s>]/gi) || []).length;
-  const closes = (cleanHtml.match(/<\/div>/gi) || []).length;
-  if (opens > closes) cleanHtml += "</div>".repeat(opens - closes);
-  // \n\n após </div> garante linha em branco para terminar o bloco HTML no CommonMark
-  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${cleanHtml}\n</div>\n\n`;
+  // Fecha todas as tags abertas via pilha — mais robusto que contar apenas <div>
+  cleanHtml = balanceHtmlTags(cleanHtml);
+  // overflow:auto (não hidden) para evitar que conteúdo seja cortado na impressão/PDF
+  const section = `\n\n## 🖥️ Wireframe da Tela\n\n<div class="mockup-frame" style="border:1px solid #dee2e6;border-radius:8px;overflow:auto;margin:16px 0;font-family:sans-serif;font-size:13px;">\n${cleanHtml}\n</div>\n\n`;
   const firstH2 = markdown.indexOf("\n## ");
   if (firstH2 !== -1) return markdown.slice(0, firstH2) + section + markdown.slice(firstH2);
   return markdown + section;

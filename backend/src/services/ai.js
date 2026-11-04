@@ -624,7 +624,7 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
   const message = await callWithRetry(
     () => client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 2048,
+      max_tokens: 3072,
       system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: prompt }],
     })
@@ -641,6 +641,9 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
   // Colapsa linhas em branco — linha vazia dentro de bloco HTML termina o bloco no CommonMark
   html = html.replace(/\n{2,}/g, "\n");
 
+  // HTML truncado (não termina com >) quebra o markdown — melhor não injetar nada
+  if (!html.trim().endsWith('>')) return null;
+
   // Se a IA devolveu marcação invisível, não há tela para mostrar
   if (html.includes('display:none') || html.length < 50) return null;
 
@@ -654,9 +657,11 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
 async function generateGroupMockup(wFiles) {
   const systemPrompt = buildSystemPrompt();
 
-  // Container: arquivo que instancia os outros (tem adm-create-objects, DEFINE WINDOW ou SmartWindow)
-  const isContainer = (f) => /adm-create-objects|DEFINE\s+WINDOW|SmartWindow/i.test(f.content);
-  const container = wFiles.find(isContainer) || wFiles[0];
+  // Container: arquivo cujo nome é o mais curto (sem sufixos -b01, -v01, etc.)
+  // e que tenha o marcador de container — o filename mais curto é quase sempre o container principal
+  const isContainerFile = (f) => /adm-create-objects|DEFINE\s+WINDOW|SmartWindow/i.test(f.content);
+  const sortedByLen = [...wFiles].sort((a, b) => path.basename(a.name).length - path.basename(b.name).length);
+  const container = sortedByLen.find(isContainerFile) || sortedByLen[0];
   const others = wFiles.filter((f) => f !== container);
 
   function classifyW(f) {
@@ -702,7 +707,7 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
   const message = await callWithRetry(
     () => client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 2048,
+      max_tokens: 3072,
       system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: prompt }],
     })
@@ -715,6 +720,9 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
 
   html = html.replace(/<!--[\s\S]*?-->/g, "");
   html = html.replace(/\n{2,}/g, "\n");
+
+  // HTML truncado (não termina com >) quebra o markdown — melhor não injetar nada
+  if (!html.trim().endsWith('>')) return null;
 
   if (html.includes("display:none") || html.length < 50) return null;
   return html;
