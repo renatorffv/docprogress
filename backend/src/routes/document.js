@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup } = require("../services/ai");
+const { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup, generateGroupMockup } = require("../services/ai");
 const { getProjectFiles, getProject, saveDocumentation, getDocumentation, saveAnalysis, getAnalysis, clearNeedsRedoc, updateGroupDescription } = require("../services/storage");
 const { buildDependencyGraph } = require("../services/analyzer");
 const { getSettings } = require("../services/settings");
@@ -282,11 +282,14 @@ router.post("/group", (req, res) => {
       );
 
       if (manifest?.includeMockups) {
-        const wFile = groupFiles.find((f) => f.name.toLowerCase().endsWith(".w"));
-        if (wFile) {
+        const wFiles = groupFiles.filter((f) => f.name.toLowerCase().endsWith(".w"));
+        if (wFiles.length > 0) {
           const cur = getJob(jobId) || {};
           setJob(jobId, { ...cur, message: "Gerando wireframe da tela..." });
-          const html = await generateMockup(wFile.content, wFile.name).catch(() => null);
+          // Com múltiplos .w, usa generateGroupMockup para montar a tela completa (container + sub-programas)
+          const html = wFiles.length === 1
+            ? await generateMockup(wFiles[0].content, wFiles[0].name).catch(() => null)
+            : await generateGroupMockup(wFiles).catch(() => null);
           if (html) markdown = injectMockup(markdown, html);
         }
       }

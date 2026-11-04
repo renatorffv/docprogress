@@ -647,4 +647,77 @@ Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
   return html;
 }
 
-module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup };
+/**
+ * Gera wireframe da tela COMPLETA montada a partir de múltiplos .w de um grupo ADM.
+ * Passa o container + sub-programas (Viewer, Browser, Panels) para a IA montar o visual completo.
+ */
+async function generateGroupMockup(wFiles) {
+  const systemPrompt = buildSystemPrompt();
+
+  // Container: arquivo que instancia os outros (tem adm-create-objects, DEFINE WINDOW ou SmartWindow)
+  const isContainer = (f) => /adm-create-objects|DEFINE\s+WINDOW|SmartWindow/i.test(f.content);
+  const container = wFiles.find(isContainer) || wFiles[0];
+  const others = wFiles.filter((f) => f !== container);
+
+  function classifyW(f) {
+    const c = f.content;
+    if (/SmartBrowser|DEFINE\s+BROWSE/i.test(c)) return "SmartBrowser (tabela/grid de dados)";
+    if (/SmartViewer|\{src\/adm\/method\/viewer/i.test(c)) return "SmartViewer (formulário de campos)";
+    if (/SmartQuery|\{src\/adm\/method\/query/i.test(c)) return "SmartQuery (fonte de dados — sem UI)";
+    if (/SmartPanel|\{src\/adm\/method\/panel/i.test(c)) return "SmartPanel (barra de botões)";
+    return "Sub-programa";
+  }
+
+  const containerSnippet = container.content.slice(0, 3500);
+  const subSections = others.slice(0, 4).map((f) => {
+    const type = classifyW(f);
+    return `### ${path.basename(f.name)} (${type})\n\`\`\`progress\n${f.content.slice(0, 2000)}\n\`\`\``;
+  }).join("\n\n");
+
+  const prompt = `Você é um especialista em Progress 4GL / ADM Datasul. Analise o container principal e seus sub-programas abaixo e gere um wireframe HTML que represente a tela COMPLETA e MONTADA como o usuário a veria, combinando todos os componentes em uma única janela.
+
+REGRAS OBRIGATÓRIAS:
+- Retorne APENAS um único <div> HTML com estilos inline — sem CSS externo, sem JS, sem imports
+- Estilo wireframe minimalista: fundo #f8f9fa, bordas #ced4da, texto #343a40
+- Inclua uma barra de título no topo (fundo #495057, texto branco, padding 8px 12px) com o nome: ${path.basename(container.name)}
+- Monte a janela como o usuário a veria: barra de menu (Arquivo, Ajuda...), SmartViewer com os campos reais (FILL-IN com labels), SmartBrowser com as colunas reais da tabela e dados fictícios de exemplo, e painéis de botões (navegação: Primeiro/Anterior/Próximo/Último; controle: Alterar/Salvar/Cancelar)
+- SmartViewer: represente os campos FILL-IN/COMBO-BOX com labels e bordas, agrupados em frame
+- SmartBrowser: represente a tabela com as colunas reais extraídas do código e 2-3 linhas de dados fictícios
+- SmartPanels: represente as barras de botões horizontalmente, como botões reais com texto
+- Largura máxima 680px, altura automática conforme conteúdo
+- NÃO inclua doctype, html, head ou body — apenas o <div> raiz
+- NÃO inclua comentários HTML (<!-- -->) — eles quebram o parser de markdown
+- NÃO deixe linhas em branco entre elementos — use apenas quebras de linha simples
+
+## Container Principal: ${path.basename(container.name)}
+\`\`\`progress
+${containerSnippet}
+\`\`\`
+
+## Sub-programas instanciados pelo container:
+${subSections}
+
+Retorne APENAS o HTML do <div>, sem markdown, sem explicações.`;
+
+  const message = await callWithRetry(
+    () => client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 2048,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: prompt }],
+    })
+  );
+
+  let html = message.content[0].text.trim()
+    .replace(/^```(?:html)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+
+  html = html.replace(/<!--[\s\S]*?-->/g, "");
+  html = html.replace(/\n{2,}/g, "\n");
+
+  if (html.includes("display:none") || html.length < 50) return null;
+  return html;
+}
+
+module.exports = { documentCode, documentProject, analyzeProjectGroups, documentGroup, generateMockup, generateGroupMockup };
